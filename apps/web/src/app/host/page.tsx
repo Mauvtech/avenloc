@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { api, type ConnectStatus } from '@/lib/api';
 import { isAuthenticated } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
-import { EmptyState, PageHeader } from '@/components/ui';
+import { EmptyState, PageHeader, PageLoader } from '@/components/ui';
+import { useConfirm } from '@/components/confirm';
 import {
   LISTING_STATUS_CLASS,
   LISTING_STATUS_LABEL,
@@ -29,6 +30,7 @@ const fdate = (s: string) => new Date(s).toLocaleDateString('fr-FR', { day: '2-d
 
 export default function HostDashboardPage() {
   const router = useRouter();
+  const confirm = useConfirm();
   const [listings, setListings] = useState<Listing[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [connect, setConnect] = useState<ConnectStatus | null>(null);
@@ -152,7 +154,7 @@ export default function HostDashboardPage() {
     [bookings, todayTs],
   );
 
-  if (loading) return <p className="py-16 text-center text-muted">Chargement…</p>;
+  if (loading) return <PageLoader />;
 
   const active = connect?.connected && connect.status === 'active';
   const connectPending = connect?.connected && connect.status !== 'active';
@@ -227,7 +229,7 @@ export default function HostDashboardPage() {
         </div>
       </section>
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-danger-fg">{error}</p>}
 
       {/* ── Réservations ─────────────────────────────────────────────── */}
       <section className="space-y-3">
@@ -248,7 +250,7 @@ export default function HostDashboardPage() {
               className={`rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-colors ${
                 tab === key
                   ? 'border-brand bg-brand text-white'
-                  : 'border-line bg-white text-muted hover:text-ink'
+                  : 'border-line bg-surface text-muted hover:text-ink'
               }`}
             >
               {label}
@@ -420,12 +422,16 @@ export default function HostDashboardPage() {
                     {l.status !== 'ARCHIVED' && (
                       <button
                         disabled={isBusy}
-                        onClick={() => {
-                          if (confirm('Archiver cette annonce ? Elle ne sera plus réservable.')) {
-                            run(l.id, () => api.listings.archive(l.id));
-                          }
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: 'Archiver cette annonce ?',
+                            body: 'Elle ne sera plus visible ni réservable. Les réservations en cours ne sont pas affectées.',
+                            confirmLabel: 'Archiver',
+                            danger: true,
+                          });
+                          if (ok) run(l.id, () => api.listings.archive(l.id));
                         }}
-                        className="rounded px-3 py-2 text-[13px] font-semibold text-muted transition-colors hover:text-red-500"
+                        className="rounded px-3 py-2 text-[13px] font-semibold text-muted transition-colors hover:text-danger-fg"
                       >
                         Archiver
                       </button>
@@ -455,7 +461,7 @@ function Kpi({
   return (
     <div
       className={`rounded-lg border p-4 ${
-        accent ? 'border-brand bg-brand-tint/50' : 'border-line bg-white shadow-card'
+        accent ? 'border-brand bg-brand-tint/50' : 'border-line bg-surface shadow-card'
       }`}
     >
       <div className={`text-xs ${accent ? 'font-semibold text-brand-fg' : 'text-muted'}`}>{label}</div>

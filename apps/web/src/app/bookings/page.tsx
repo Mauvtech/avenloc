@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { isAuthenticated } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
 import { EmptyState, PageHeader, Skeleton } from '@/components/ui';
+import { dateShort, eur } from '@/lib/format';
 import type { Booking } from '@/lib/types';
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -15,8 +16,6 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   CANCELLED: { label: 'Annulée', cls: 'bg-danger-tint text-danger-fg' },
   COMPLETED: { label: 'Terminée', cls: 'bg-canvas text-muted' },
 };
-
-const fdate = (s: string) => new Date(s).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 
 export default function BookingsPage() {
   const router = useRouter();
@@ -64,11 +63,7 @@ export default function BookingsPage() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold">{b.listing?.title ?? 'Annonce'}</p>
                 <p className="text-xs text-muted">
-                  {fdate(b.startDate)} → {fdate(b.endDate)} · {b.guestCount} loc. ·{' '}
-                  {Number(b.totalAmount).toLocaleString('fr-FR', {
-                    style: 'currency',
-                    currency: 'EUR',
-                  })}
+                  {dateShort(b.startDate)} → {dateShort(b.endDate)} · {b.guestCount} pers. · {eur(b.totalAmount)}
                 </p>
               </div>
               <span

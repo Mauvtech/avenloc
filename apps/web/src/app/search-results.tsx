@@ -11,7 +11,9 @@ async function fetchResults(
 ): Promise<SearchResult> {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined) qs.set(k, Array.isArray(v) ? v[0] : v);
+    if (v === undefined) continue;
+    if (k === 'place') continue; // paramètre d'affichage uniquement (nom de ville saisi)
+    qs.set(k, Array.isArray(v) ? v[0] : v);
   }
   if (!qs.has('limit')) qs.set('limit', String(DEFAULT_LIMIT));
   const res = await fetch(`${API_URL}/search?${qs.toString()}`, { cache: 'no-store' });
@@ -28,7 +30,9 @@ const Grid = ({ children }: { children: React.ReactNode }) => (
 );
 
 export default async function SearchResults({ searchParams }: Props) {
-  const isSearch = 'lat' in searchParams;
+  const isSearch = ['lat', 'type', 'q', 'minPrice', 'maxPrice', 'maxGuests', 'amenities'].some(
+    (k) => k in searchParams,
+  );
 
   let result: SearchResult;
   try {
@@ -51,6 +55,7 @@ export default async function SearchResults({ searchParams }: Props) {
     );
   }
 
+  const place = typeof searchParams.place === 'string' ? searchParams.place : null;
   const shown = result.listings.length;
   const currentLimit = Number(
     Array.isArray(searchParams.limit) ? searchParams.limit[0] : searchParams.limit,
@@ -61,7 +66,9 @@ export default async function SearchResults({ searchParams }: Props) {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-semibold">
-          {isSearch ? `${result.total} résultat${result.total > 1 ? 's' : ''}` : 'Annonces récentes'}
+          {isSearch
+            ? `${result.total} résultat${result.total > 1 ? 's' : ''}${place ? ` · ${place}` : ''}`
+            : 'Annonces récentes'}
           <span className="font-normal text-muted">
             {' '}
             · {shown} affichée{shown > 1 ? 's' : ''}

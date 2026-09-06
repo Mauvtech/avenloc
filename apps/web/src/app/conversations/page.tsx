@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { isAuthenticated } from '@/lib/auth';
 import Avatar from '@/components/avatar';
-import { EmptyState, PageHeader } from '@/components/ui';
+import { EmptyState, PageHeader, PageLoader } from '@/components/ui';
 import type { Conversation, Message } from '@/lib/types';
 
 const partyName = (c: Conversation | null) =>
@@ -70,7 +70,7 @@ export default function ConversationsPage() {
     }
   }
 
-  if (loading) return <p className="py-16 text-center text-muted">Chargement…</p>;
+  if (loading) return <PageLoader />;
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">

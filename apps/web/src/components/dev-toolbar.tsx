@@ -43,7 +43,7 @@ export default function DevToolbar() {
   return (
     <div className="fixed bottom-3 left-3 z-[100] font-sans text-sm">
       {open ? (
-        <div className="w-64 rounded-lg border border-line bg-white p-3 shadow-modal">
+        <div className="w-64 rounded-lg border border-line bg-surface p-3 shadow-modal">
           <div className="mb-2 flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wide text-muted">
               Mode démo
@@ -79,8 +79,8 @@ export default function DevToolbar() {
           onClick={() => setOpen(true)}
           className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-card ${
             anyOn
-              ? 'border-amber-300 bg-amber-100 text-amber-800'
-              : 'border-line bg-white text-muted'
+              ? 'border-warn/40 bg-warn-tint text-warn-fg'
+              : 'border-line bg-surface text-muted'
           }`}
         >
           ⚙︎ Démo{anyOn ? ' · actif' : ''}

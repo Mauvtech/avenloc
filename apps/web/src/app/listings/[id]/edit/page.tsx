@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { isAuthenticated } from '@/lib/auth';
 import ListingPhotos from '@/components/listing-photos';
 import { useToast } from '@/components/toast';
+import { PageLoader } from '@/components/ui';
 import { CANCELLATION_LABEL, CANCELLATION_POLICIES, typeLabel } from '@/lib/listing';
 import type { Listing } from '@/lib/types';
 
@@ -80,7 +81,7 @@ export default function EditListingPage() {
     }
   }
 
-  if (loading) return <p className="py-16 text-center text-muted">Chargement…</p>;
+  if (loading) return <PageLoader />;
   if (!listing) return null;
 
   return (

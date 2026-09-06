@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { clearTokens, getRefreshToken, isAuthenticated } from '@/lib/auth';
 import Avatar from '@/components/avatar';
+import { PageLoader } from '@/components/ui';
 import type { User } from '@/lib/types';
 
 const ROLE_LABEL: Record<string, string> = {
@@ -101,7 +102,7 @@ export default function ProfilePage() {
     router.refresh();
   }
 
-  if (loading) return <p className="py-16 text-center text-muted">Chargement…</p>;
+  if (loading) return <PageLoader />;
   if (!user) return null;
 
   const isHost = user.roles.includes('HOST');
@@ -117,7 +118,7 @@ export default function ProfilePage() {
           <button
             onClick={() => fileRef.current?.click()}
             disabled={avatarBusy}
-            className="absolute -bottom-1 -right-1 rounded-full border border-line bg-white px-2 py-1 text-[11px] font-semibold shadow-card hover:bg-canvas"
+            className="absolute -bottom-1 -right-1 rounded-full border border-line bg-surface px-2 py-1 text-[11px] font-semibold shadow-card hover:bg-canvas"
           >
             {avatarBusy ? '…' : 'Photo'}
           </button>
@@ -158,7 +159,7 @@ export default function ProfilePage() {
         </span>
       </div>
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-danger-fg">{error}</p>}
 
       {/* Infos / édition */}
       <div className="card space-y-3 p-5">
@@ -269,7 +270,7 @@ export default function ProfilePage() {
 
       <button
         onClick={handleLogout}
-        className="w-full rounded border border-line py-3 text-sm font-semibold text-muted transition-colors hover:text-red-500"
+        className="w-full rounded border border-line py-3 text-sm font-semibold text-muted transition-colors hover:text-danger-fg"
       >
         Se déconnecter
       </button>

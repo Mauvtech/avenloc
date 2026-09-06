@@ -46,7 +46,7 @@ function RegisterForm() {
   return (
     <div className="mx-auto max-w-sm py-6">
       <div className="mb-7 flex items-center justify-center gap-2.5">
-        <span className="flex h-7 w-7 items-center justify-center rounded bg-brand text-[15px] font-extrabold text-white">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-[15px] font-extrabold text-white">
           A
         </span>
         <span className="text-lg font-bold">Aven</span>
@@ -57,7 +57,7 @@ function RegisterForm() {
           <Link href="/auth/login" className={`${tab} bg-canvas text-muted hover:text-ink`}>
             Connexion
           </Link>
-          <span className={`${tab} bg-white text-ink`}>Inscription</span>
+          <span className={`${tab} bg-surface text-ink`}>Inscription</span>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 p-6">
@@ -117,7 +117,7 @@ function RegisterForm() {
               className="field"
             />
           </div>
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-sm text-danger-fg">{error}</p>}
           <button type="submit" disabled={loading} className="btn-primary w-full">
             {loading
               ? 'Chargement…'

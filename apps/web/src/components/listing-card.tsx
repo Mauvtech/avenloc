@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import CategoryIcon from '@/components/category-icon';
 import WishlistButton from '@/components/wishlist-button';
+import { eurRound } from '@/lib/format';
 import { typeLabel, UNIT_LABEL_SHORT } from '@/lib/listing';
 import type { SearchResultItem } from '@/lib/types';
 
@@ -46,7 +47,7 @@ export default function ListingCard({ listing }: { listing: SearchResultItem }) 
           {listing.distanceKm > 0 && ` · ${listing.distanceKm.toFixed(1)} km`}
         </p>
         <p className="pt-1 text-[15px]">
-          <span className="font-extrabold">{listing.basePrice} €</span>
+          <span className="font-extrabold">{eurRound(listing.basePrice)}</span>
           <span className="text-sm text-muted"> / {unit}</span>
         </p>
       </div>

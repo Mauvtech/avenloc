@@ -36,7 +36,7 @@ export default function LoginPage() {
   return (
     <div className="mx-auto max-w-sm py-6">
       <div className="mb-7 flex items-center justify-center gap-2.5">
-        <span className="flex h-7 w-7 items-center justify-center rounded bg-brand text-[15px] font-extrabold text-white">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-[15px] font-extrabold text-white">
           A
         </span>
         <span className="text-lg font-bold">Aven</span>
@@ -44,7 +44,7 @@ export default function LoginPage() {
 
       <div className="card overflow-hidden">
         <div className="flex border-b border-line">
-          <span className={`${tab} bg-white text-ink`}>Connexion</span>
+          <span className={`${tab} bg-surface text-ink`}>Connexion</span>
           <Link href="/auth/register" className={`${tab} bg-canvas text-muted hover:text-ink`}>
             Inscription
           </Link>
@@ -76,7 +76,7 @@ export default function LoginPage() {
               className="field"
             />
           </div>
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-sm text-danger-fg">{error}</p>}
           <button type="submit" disabled={loading} className="btn-primary w-full">
             {loading ? 'Chargement…' : 'Se connecter'}
           </button>

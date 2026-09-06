@@ -9,22 +9,23 @@ import CategoryIcon from '@/components/category-icon';
 import DateRangePicker from '@/components/date-range-picker';
 import PriceBreakdown from '@/components/price-breakdown';
 import Avatar from '@/components/avatar';
-import { Skeleton } from '@/components/ui';
+import ListingCard from '@/components/listing-card';
+import { BackLink, Skeleton, StarRating } from '@/components/ui';
 import { useToast } from '@/components/toast';
+import { eur, eurRound } from '@/lib/format';
 import {
   CANCELLATION_LABEL,
+  capacityNoun,
   LISTING_STATUS_CLASS,
   LISTING_STATUS_LABEL,
   typeLabel,
   UNIT_LABEL_SHORT,
 } from '@/lib/listing';
-import type { Listing, Quote, ReviewList, User } from '@/lib/types';
+import type { Listing, Quote, ReviewList, SearchResultItem, User } from '@/lib/types';
 
 const attrValue = (v: unknown) =>
   typeof v === 'boolean' ? (v ? 'Oui' : 'Non') : v == null ? '—' : String(v);
 const humanize = (k: string) => k.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
-const eur = (v: string | number) =>
-  Number(v).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 export default function ListingPage() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +35,7 @@ export default function ListingPage() {
   const [listing, setListing] = useState<Listing | null>(null);
   const [reviews, setReviews] = useState<ReviewList | null>(null);
   const [me, setMe] = useState<User | null>(null);
+  const [similar, setSimilar] = useState<SearchResultItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
@@ -55,10 +57,22 @@ export default function ListingPage() {
         setListing(l);
         setReviews(r);
         setMe(u);
+        api.listings
+          .search(`type=${l.type}&limit=7`)
+          .then((res) => setSimilar(res.listings.filter((x) => x.id !== l.id).slice(0, 3)))
+          .catch(() => setSimilar([]));
       })
       .catch(() => router.replace('/'))
       .finally(() => setLoading(false));
   }, [id, router]);
+
+  // Fermeture de la lightbox au clavier.
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setLightbox(null);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [lightbox]);
 
   // Devis live dès que les deux dates sont choisies.
   useEffect(() => {
@@ -148,10 +162,8 @@ export default function ListingPage() {
     : null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <button onClick={() => router.back()} className="text-sm text-muted hover:text-ink">
-        ← Retour
-      </button>
+    <div className="mx-auto max-w-5xl space-y-6 pb-20 md:pb-0">
+      <BackLink href="/">Retour aux annonces</BackLink>
 
       {isOwner && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand/30 bg-brand-tint/60 px-4 py-3 text-sm">
@@ -251,7 +263,7 @@ export default function ListingPage() {
               </Link>
               {listing.maxGuests && (
                 <span className="rounded-full bg-canvas px-3 py-1 text-xs font-semibold text-muted">
-                  {listing.maxGuests} locataire(s) max
+                  {listing.maxGuests} {capacityNoun(listing.type)} max
                 </span>
               )}
             </section>
@@ -295,7 +307,17 @@ export default function ListingPage() {
           )}
 
           <section>
-            <h2 className="section-title mb-2">Emplacement</h2>
+            <div className="mb-2 flex items-baseline justify-between gap-2">
+              <h2 className="section-title">Emplacement</h2>
+              <a
+                href={`https://www.openstreetmap.org/?mlat=${listing.latitude}&mlon=${listing.longitude}#map=15/${listing.latitude}/${listing.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-semibold text-brand-fg hover:underline"
+              >
+                Voir en grand ↗
+              </a>
+            </div>
             <p className="mb-3 text-sm text-muted">
               {listing.city} ({listing.postalCode}). L&apos;adresse exacte est communiquée après
               confirmation de la réservation.
@@ -341,7 +363,9 @@ export default function ListingPage() {
                         <span className="font-semibold">
                           {r.author ? `${r.author.firstName} ${r.author.lastName}` : 'Anonyme'}
                         </span>
-                        <span className="text-muted"> · ★ {r.rating}</span>
+                        <div className="mt-0.5">
+                          <StarRating value={r.rating} readOnly size={13} />
+                        </div>
                       </div>
                     </div>
                     {r.comment && (
@@ -359,7 +383,7 @@ export default function ListingPage() {
           <div className="card sticky top-20 space-y-4 p-4 shadow-raised">
             <div className="flex items-baseline justify-between">
               <div>
-                <span className="text-xl font-extrabold">{listing.basePrice} €</span>
+                <span className="text-xl font-extrabold">{eurRound(listing.basePrice)}</span>
                 <span className="text-sm text-muted"> / {unit}</span>
               </div>
               {rating !== null && (
@@ -411,7 +435,7 @@ export default function ListingPage() {
                   </p>
                 )}
 
-                <form onSubmit={handleBook} className="space-y-3">
+                <form id="booking" onSubmit={handleBook} className="scroll-mt-20 space-y-3">
                   <div>
                     <label className="label">Dates</label>
                     <DateRangePicker listingId={listing.id} value={range} onChange={setRange} />
@@ -485,12 +509,50 @@ export default function ListingPage() {
         </div>
       </div>
 
+      {/* Espaces similaires */}
+      {similar.length > 0 && (
+        <section className="border-t border-line pt-8">
+          <h2 className="section-title mb-3">Espaces similaires</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {similar.map((s) => (
+              <ListingCard key={s.id} listing={s} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Barre d'action mobile */}
+      {!isOwner && (
+        <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur md:hidden">
+          <div className="text-sm">
+            <span className="font-extrabold">{eurRound(listing.basePrice)}</span>
+            <span className="text-muted"> / {unit}</span>
+          </div>
+          <a
+            href="#booking"
+            className={`btn-primary ${!paymentsReady ? 'pointer-events-none opacity-50' : ''}`}
+          >
+            {paymentsReady ? 'Réserver' : 'Indisponible'}
+          </a>
+        </div>
+      )}
+
       {/* Lightbox */}
       {lightbox && (
         <div
           onClick={() => setLightbox(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Photo en plein écran"
           className="fixed inset-0 z-[150] flex items-center justify-center bg-ink/80 p-4"
         >
+          <button
+            onClick={() => setLightbox(null)}
+            aria-label="Fermer"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-surface/90 text-lg text-ink hover:bg-surface"
+          >
+            ✕
+          </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={lightbox} alt="" className="max-h-full max-w-full rounded-lg object-contain" />
         </div>

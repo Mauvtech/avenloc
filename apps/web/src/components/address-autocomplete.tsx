@@ -98,7 +98,7 @@ export default function AddressAutocomplete({
       {loading && <span className="absolute right-3 top-2.5 text-xs text-muted">…</span>}
 
       {open && results.length > 0 && (
-        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded border border-line bg-white shadow-modal">
+        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded border border-line bg-surface shadow-modal">
           {results.map((r, i) => (
             <li key={r.id}>
               <button

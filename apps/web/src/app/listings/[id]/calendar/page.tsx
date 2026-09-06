@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { isAuthenticated } from '@/lib/auth';
 import AvailabilityCalendar from '@/components/availability-calendar';
+import { PageLoader } from '@/components/ui';
 import { typeLabel } from '@/lib/listing';
 import type { Listing } from '@/lib/types';
 
@@ -32,7 +33,7 @@ export default function ListingCalendarPage() {
       .finally(() => setLoading(false));
   }, [id, router]);
 
-  if (loading) return <p className="py-16 text-center text-muted">Chargement…</p>;
+  if (loading) return <PageLoader />;
   if (!listing) return null;
 
   return (

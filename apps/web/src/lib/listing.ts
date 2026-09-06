@@ -15,6 +15,32 @@ export const TYPE_LABEL: Record<string, string> = {
 
 export const LISTING_TYPES = Object.keys(TYPE_LABEL);
 
+// Ordre d'affichage sur la page d'accueil (types les plus demandés en premier).
+export const BROWSE_TYPES = [
+  'APARTMENT',
+  'HOUSE',
+  'OFFICE',
+  'MEETING_ROOM',
+  'EVENT_SPACE',
+  'WORKSHOP',
+  'WAREHOUSE',
+  'PARKING',
+];
+
+// Libellé de capacité adapté au type (une salle n'a pas de « locataires »).
+const CAPACITY_NOUN: Record<string, string> = {
+  MEETING_ROOM: 'personnes',
+  EVENT_SPACE: 'personnes',
+  OFFICE: 'postes',
+  WORKSHOP: 'personnes',
+  WAREHOUSE: 'm² utiles',
+  PARKING: 'véhicules',
+};
+
+export function capacityNoun(type: string): string {
+  return CAPACITY_NOUN[type] ?? 'personnes';
+}
+
 export const UNIT_LABEL: Record<string, string> = {
   NIGHT: '/ nuit',
   HOUR: '/ heure',
@@ -50,6 +76,6 @@ export const LISTING_STATUS_LABEL: Record<string, string> = {
 
 export const LISTING_STATUS_CLASS: Record<string, string> = {
   DRAFT: 'bg-canvas text-muted',
-  PUBLISHED: 'bg-emerald-100 text-emerald-800',
-  ARCHIVED: 'bg-red-100 text-red-700',
+  PUBLISHED: 'bg-success-tint text-success-fg',
+  ARCHIVED: 'bg-danger-tint text-danger-fg',
 };

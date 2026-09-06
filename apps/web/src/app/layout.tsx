@@ -5,6 +5,7 @@ import Nav from '@/components/nav';
 import Footer from '@/components/footer';
 import DevToolbar from '@/components/dev-toolbar';
 import { ToastProvider } from '@/components/toast';
+import { ConfirmProvider } from '@/components/confirm';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -23,10 +24,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr" className={inter.variable}>
       <body className="flex min-h-screen flex-col">
         <ToastProvider>
-          <Nav />
-          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">{children}</main>
-          <Footer />
-          <DevToolbar />
+          <ConfirmProvider>
+            <Nav />
+            <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">{children}</main>
+            <Footer />
+            <DevToolbar />
+          </ConfirmProvider>
         </ToastProvider>
       </body>
     </html>

@@ -41,9 +41,9 @@ module.exports = {
         xl: '1.125rem',
       },
       boxShadow: {
-        xs: '0 1px 2px oklch(0.2 0.02 265 / 0.05)',
-        card: '0 1px 3px oklch(0.2 0.02 265 / 0.06), 0 1px 2px oklch(0.2 0.02 265 / 0.04)',
-        raised: '0 4px 12px oklch(0.2 0.02 265 / 0.08), 0 2px 4px oklch(0.2 0.02 265 / 0.04)',
+        xs: '0 1px 2px oklch(0.2 0.02 265 / 0.06)',
+        card: '0 1px 2px oklch(0.2 0.02 265 / 0.06), 0 2px 8px oklch(0.2 0.02 265 / 0.06)',
+        raised: '0 6px 20px oklch(0.2 0.02 265 / 0.1), 0 2px 6px oklch(0.2 0.02 265 / 0.05)',
         header: '0 1px 0 oklch(0.9 0.005 265 / 1)',
         modal: '0 16px 48px oklch(0.15 0.02 265 / 0.24)',
         focus: '0 0 0 3px oklch(0.52 0.16 290 / 0.18)',

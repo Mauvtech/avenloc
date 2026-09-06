@@ -30,7 +30,7 @@ function AuthCallback() {
   if (error) {
     return (
       <div className="space-y-4 py-16 text-center">
-        <p className="text-red-500">{error}</p>
+        <p className="text-danger-fg">{error}</p>
         <a href="/auth/login" className="font-semibold">
           Retour à la connexion
         </a>

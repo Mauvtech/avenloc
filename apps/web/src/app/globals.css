@@ -97,7 +97,7 @@
 
   /* ── Divers ─────────────────────────────────────────────────────────── */
   .section-title {
-    @apply text-base font-bold text-ink;
+    @apply text-[17px] font-extrabold tracking-tight text-ink;
   }
   .skeleton {
     @apply relative overflow-hidden rounded-md bg-line/50;

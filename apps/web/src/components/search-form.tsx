@@ -22,8 +22,12 @@ export default function SearchForm() {
   const router = useRouter();
   const params = useSearchParams();
 
-  const [locationText, setLocationText] = useState('');
-  const [picked, setPicked] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationText, setLocationText] = useState(params.get('place') ?? '');
+  const [picked, setPicked] = useState<{ lat: number; lng: number } | null>(
+    params.get('lat') && params.get('lng')
+      ? { lat: Number(params.get('lat')), lng: Number(params.get('lng')) }
+      : null,
+  );
   const [startDate, setStartDate] = useState(params.get('startDate') ?? '');
   const [endDate, setEndDate] = useState(params.get('endDate') ?? '');
   const [type, setType] = useState(params.get('type') ?? '');
@@ -44,30 +48,42 @@ export default function SearchForm() {
     (maxPrice ? 1 : 0) +
     amenities.length;
 
-  async function resolveCoords() {
+  const [locError, setLocError] = useState<string | null>(null);
+
+  // Renvoie des coords si un lieu est fourni, null si le champ est vide
+  // (→ recherche « toutes villes »), ou `false` si le lieu est introuvable.
+  async function resolveCoords(): Promise<{ lat: number; lng: number } | null | false> {
     if (picked) return picked;
-    const key = locationText.trim().toLowerCase().replace(/\s*\(\d{4,5}\)\s*$/, '');
-    if (locationText.trim()) {
-      try {
-        const r = await geocodeCity(locationText);
-        if (r) return { lat: r.latitude, lng: r.longitude };
-      } catch {
-        /* fallback */
-      }
+    const raw = locationText.trim();
+    if (!raw) return null;
+    const key = raw.toLowerCase().replace(/\s*\(\d{4,5}\)\s*$/, '');
+    if (CITY_FALLBACK[key]) return CITY_FALLBACK[key];
+    try {
+      const r = await geocodeCity(raw);
+      if (r) return { lat: r.latitude, lng: r.longitude };
+    } catch {
+      /* ignore */
     }
-    return CITY_FALLBACK[key] ?? { lat: 48.8566, lng: 2.3522 };
+    return false;
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
+    setLocError(null);
     try {
       const coords = await resolveCoords();
-      const p = new URLSearchParams({
-        lat: String(coords.lat),
-        lng: String(coords.lng),
-        radius: radius || '25',
-      });
+      if (coords === false) {
+        setLocError('Ville introuvable — vérifiez l’orthographe ou choisissez une suggestion.');
+        return;
+      }
+      const p = new URLSearchParams();
+      if (coords) {
+        p.set('lat', String(coords.lat));
+        p.set('lng', String(coords.lng));
+        p.set('radius', radius || '25');
+        if (locationText.trim()) p.set('place', locationText.trim());
+      }
       if (type) p.set('type', type);
       if (startDate) p.set('startDate', startDate);
       if (endDate) p.set('endDate', endDate);
@@ -77,7 +93,8 @@ export default function SearchForm() {
       if (amenities.length) p.set('amenities', amenities.join(','));
       const sort = params.get('sort');
       if (sort) p.set('sort', sort);
-      router.push(`/?${p.toString()}`);
+      const qs = p.toString();
+      router.push(qs ? `/?${qs}` : '/');
     } finally {
       setSubmitting(false);
     }
@@ -93,11 +110,13 @@ export default function SearchForm() {
             value={locationText}
             onQueryChange={(t) => {
               setLocationText(t);
+              setLocError(null);
               if (picked) setPicked(null);
             }}
             onSelect={(r: GeoResult) => setPicked({ lat: r.latitude, lng: r.longitude })}
-            placeholder="Ville…"
+            placeholder="Toute la France"
           />
+          {locError && <p className="mt-1 text-xs text-danger-fg">{locError}</p>}
         </div>
         <div>
           <label className="label">Arrivée</label>

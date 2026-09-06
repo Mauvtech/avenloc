@@ -65,7 +65,7 @@ export default function ListingPhotos({ listingId, initialPhotos }: Props) {
         />
       </label>
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-danger-fg">{error}</p>}
 
       {photos.length > 0 ? (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -74,7 +74,7 @@ export default function ListingPhotos({ listingId, initialPhotos }: Props) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={photo.url} alt={photo.caption ?? ''} className="h-full w-full object-cover" />
               {i === 0 && (
-                <span className="absolute left-1 top-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-bold text-ink shadow-card">
+                <span className="absolute left-1 top-1 rounded bg-surface/90 px-1.5 py-0.5 text-[10px] font-bold text-ink shadow-card">
                   Couverture
                 </span>
               )}
@@ -82,7 +82,7 @@ export default function ListingPhotos({ listingId, initialPhotos }: Props) {
                 type="button"
                 disabled={busy}
                 onClick={() => remove(photo.id)}
-                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-sm font-bold text-ink shadow-card"
+                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-surface/90 text-sm font-bold text-ink shadow-card"
                 aria-label="Supprimer"
               >
                 ✕

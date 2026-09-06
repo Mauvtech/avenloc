@@ -30,7 +30,7 @@ export default function ConnectRefreshPage() {
     <div className="mx-auto max-w-md space-y-4 py-16 text-center">
       {error ? (
         <>
-          <p className="text-sm text-red-500">{error}</p>
+          <p className="text-sm text-danger-fg">{error}</p>
           <Link href="/host" className="btn-primary inline-flex">
             Retour à mes annonces
           </Link>

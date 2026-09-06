@@ -164,7 +164,7 @@ export default function NewListingPage() {
                   type="button"
                   onClick={() => setForm((f) => ({ ...f, type: t }))}
                   className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-colors ${
-                    active ? 'border-brand bg-brand text-white' : 'border-line bg-white text-muted hover:text-ink'
+                    active ? 'border-brand bg-brand text-white' : 'border-line bg-surface text-muted hover:text-ink'
                   }`}
                 >
                   <CategoryIcon type={t} size={16} />
@@ -356,7 +356,7 @@ export default function NewListingPage() {
                   <button
                     type="button"
                     onClick={() => setPhotos((p) => p.filter((_, j) => j !== i))}
-                    className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-sm font-bold text-ink shadow-card"
+                    className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-surface/90 text-sm font-bold text-ink shadow-card"
                     aria-label="Retirer"
                   >
                     ✕
@@ -367,7 +367,7 @@ export default function NewListingPage() {
           )}
         </section>
 
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && <p className="text-sm text-danger-fg">{error}</p>}
 
         <div className="space-y-2">
           <button type="submit" disabled={loading} className="btn-primary w-full py-3">

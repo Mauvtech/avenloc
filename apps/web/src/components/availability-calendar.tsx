@@ -61,20 +61,20 @@ export default function AvailabilityCalendar({ listingId }: Props) {
         months={2}
         onDayClick={toggle}
         dayClassName={(iso) =>
-          `${blocked.has(iso) ? 'bg-red-100 font-semibold text-red-700 line-through' : ''} ${
+          `${blocked.has(iso) ? 'bg-danger-tint font-semibold text-danger-fg line-through' : ''} ${
             busyDay === iso ? 'opacity-40' : ''
           }`
         }
       />
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-danger-fg">{error}</p>}
 
       <div className="flex gap-4 text-xs text-muted">
         <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded bg-white ring-1 ring-line" /> Disponible
+          <span className="h-3 w-3 rounded bg-surface ring-1 ring-line" /> Disponible
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded bg-red-100 ring-1 ring-red-200" /> Bloqué
+          <span className="h-3 w-3 rounded bg-danger-tint ring-1 ring-danger/30" /> Bloqué
         </span>
       </div>
     </div>

@@ -40,7 +40,7 @@ function CheckoutForm({ onSuccess }: CheckoutFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <PaymentElement />
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-danger-fg">{error}</p>}
       <button type="submit" disabled={!stripe || loading} className="btn-primary w-full">
         {loading ? 'Traitement…' : 'Confirmer le paiement'}
       </button>

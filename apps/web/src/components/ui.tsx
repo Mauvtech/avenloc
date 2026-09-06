@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 /* ── Skeleton ────────────────────────────────────────────────────────── */
@@ -62,6 +63,100 @@ export function PageHeader({
         {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
       </div>
       {action}
+    </div>
+  );
+}
+
+/* ── Lien retour (avec destination sûre si pas d'historique) ─────────── */
+export function BackLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-1 text-sm text-muted transition-colors hover:text-ink"
+    >
+      <span aria-hidden>←</span>
+      {children}
+    </Link>
+  );
+}
+
+/* ── Chargement plein bloc (cohérent partout) ───────────────────────── */
+export function Spinner({ className = '' }: { className?: string }) {
+  return (
+    <span
+      className={`inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent ${className}`}
+      role="status"
+      aria-label="Chargement"
+    />
+  );
+}
+
+export function PageLoader({ label = 'Chargement…' }: { label?: string }) {
+  return (
+    <div className="flex flex-col items-center gap-3 py-20 text-sm text-muted">
+      <Spinner className="text-brand" />
+      {label}
+    </div>
+  );
+}
+
+/* ── Fil d'étapes ───────────────────────────────────────────────────── */
+export function Stepper({ steps, current }: { steps: string[]; current: number }) {
+  return (
+    <ol className="flex items-center gap-2 text-xs font-semibold">
+      {steps.map((label, i) => {
+        const state = i < current ? 'done' : i === current ? 'current' : 'todo';
+        return (
+          <li key={label} className="flex items-center gap-2">
+            <span
+              className={`flex h-5 w-5 flex-none items-center justify-center rounded-full text-[11px] ${
+                state === 'done'
+                  ? 'bg-success text-white'
+                  : state === 'current'
+                    ? 'bg-brand text-white'
+                    : 'bg-canvas text-muted'
+              }`}
+            >
+              {state === 'done' ? '✓' : i + 1}
+            </span>
+            <span className={state === 'todo' ? 'text-muted' : 'text-ink'}>{label}</span>
+            {i < steps.length - 1 && <span className="mx-1 h-px w-5 bg-line sm:w-8" />}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/* ── Note en étoiles (lecture seule ou saisie) ──────────────────────── */
+export function StarRating({
+  value,
+  onChange,
+  size = 22,
+  readOnly = false,
+}: {
+  value: number;
+  onChange?: (v: number) => void;
+  size?: number;
+  readOnly?: boolean;
+}) {
+  return (
+    <div className="inline-flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          disabled={readOnly}
+          onClick={() => onChange?.(n)}
+          aria-label={`${n} étoile${n > 1 ? 's' : ''}`}
+          className={`${readOnly ? 'cursor-default' : 'cursor-pointer transition-transform hover:scale-110'} ${
+            n <= value ? 'text-warn' : 'text-line'
+          }`}
+          style={{ fontSize: size, lineHeight: 1 }}
+        >
+          ★
+        </button>
+      ))}
     </div>
   );
 }
