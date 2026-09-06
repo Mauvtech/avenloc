@@ -38,19 +38,32 @@ export default function Nav() {
 
   useEffect(() => {
     setMounted(true);
-    if (isAuthenticated()) {
-      api.auth.me().then(setUser).catch(() => {
-        clearTokens();
-        setUser(null);
-      });
-      api.conversations
-        .list()
-        .then((cs) => setUnread(cs.reduce((n, c) => n + (c.unreadCount ?? 0), 0)))
-        .catch(() => setUnread(0));
-    } else {
+  }, []);
+
+  // Identité : (re)chargée quand on est authentifié sans profil en mémoire
+  // (montage, ou juste après login qui navigue vers une nouvelle route).
+  useEffect(() => {
+    if (!isAuthenticated()) {
       setUser(null);
-      setUnread(0);
+      return;
     }
+    if (user) return;
+    api.auth.me().then(setUser).catch(() => {
+      clearTokens();
+      setUser(null);
+    });
+  }, [pathname, user]);
+
+  // Compteur de messages non lus : rafraîchi à chaque navigation (léger).
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      setUnread(0);
+      return;
+    }
+    api.conversations
+      .list()
+      .then((cs) => setUnread(cs.reduce((n, c) => n + (c.unreadCount ?? 0), 0)))
+      .catch(() => setUnread(0));
   }, [pathname]);
 
   // Ferme les surcouches à chaque navigation.
@@ -203,7 +216,12 @@ export default function Nav() {
       {drawerOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-ink/40" onClick={() => setDrawerOpen(false)} />
-          <div className="absolute right-0 top-0 flex h-full w-[82%] max-w-xs animate-slide-up flex-col bg-surface shadow-modal">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu"
+            className="absolute right-0 top-0 flex h-full w-[82%] max-w-xs animate-slide-up flex-col bg-surface shadow-modal"
+          >
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <Logo />
               <button

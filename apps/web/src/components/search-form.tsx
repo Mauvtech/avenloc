@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import CategoryIcon from '@/components/category-icon';
 import AddressAutocomplete from '@/components/address-autocomplete';
+import DateRangeField from '@/components/date-range-field';
 import { geocodeCity, type GeoResult } from '@/lib/geo';
 import { LISTING_TYPES, typeLabel } from '@/lib/listing';
 
@@ -49,6 +50,47 @@ export default function SearchForm() {
     amenities.length;
 
   const [locError, setLocError] = useState<string | null>(null);
+
+  // Construit l'URL de recherche à partir de l'état courant + coords connues
+  // (sans géocodage : `picked` ou les paramètres d'URL existants).
+  function buildQuery(): string {
+    const p = new URLSearchParams();
+    const lat = picked?.lat ?? (params.get('lat') ? Number(params.get('lat')) : null);
+    const lng = picked?.lng ?? (params.get('lng') ? Number(params.get('lng')) : null);
+    if (lat != null && lng != null) {
+      p.set('lat', String(lat));
+      p.set('lng', String(lng));
+      p.set('radius', radius || '25');
+      const place = locationText.trim() || params.get('place') || '';
+      if (place) p.set('place', place);
+    }
+    if (type) p.set('type', type);
+    if (startDate) p.set('startDate', startDate);
+    if (endDate) p.set('endDate', endDate);
+    if (maxGuests) p.set('maxGuests', maxGuests);
+    if (minPrice) p.set('minPrice', minPrice);
+    if (maxPrice) p.set('maxPrice', maxPrice);
+    if (amenities.length) p.set('amenities', amenities.join(','));
+    const sort = params.get('sort');
+    if (sort) p.set('sort', sort);
+    return p.toString();
+  }
+
+  // Application immédiate (débounce) des filtres — hors champ « Lieu » qui exige
+  // un géocodage et reste soumis via le bouton.
+  const firstRun = useRef(true);
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    const t = setTimeout(() => {
+      const qs = buildQuery();
+      router.push(qs ? `/?${qs}` : '/', { scroll: false });
+    }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, minPrice, maxPrice, maxGuests, amenities.join(','), startDate, endDate]);
 
   // Renvoie des coords si un lieu est fourni, null si le champ est vide
   // (→ recherche « toutes villes »), ou `false` si le lieu est introuvable.
@@ -102,7 +144,7 @@ export default function SearchForm() {
 
   return (
     <form onSubmit={handleSubmit} className="card overflow-hidden">
-      <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-[1.4fr_1fr_1fr_auto] sm:items-end">
+      <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-[1.5fr_1.2fr_auto] sm:items-end">
         <div>
           <label className="label">Lieu</label>
           <AddressAutocomplete
@@ -119,12 +161,15 @@ export default function SearchForm() {
           {locError && <p className="mt-1 text-xs text-danger-fg">{locError}</p>}
         </div>
         <div>
-          <label className="label">Arrivée</label>
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="field" />
-        </div>
-        <div>
-          <label className="label">Départ</label>
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="field" />
+          <label className="label">Dates</label>
+          <DateRangeField
+            startDate={startDate}
+            endDate={endDate}
+            onChange={({ startDate: s, endDate: e }) => {
+              setStartDate(s);
+              setEndDate(e);
+            }}
+          />
         </div>
         <button type="submit" disabled={submitting} className="btn-primary sm:h-[42px]">
           {submitting ? '…' : 'Rechercher'}

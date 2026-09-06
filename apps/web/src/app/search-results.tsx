@@ -16,6 +16,8 @@ async function fetchResults(
     qs.set(k, Array.isArray(v) ? v[0] : v);
   }
   if (!qs.has('limit')) qs.set('limit', String(DEFAULT_LIMIT));
+  // Sans géolocalisation, le tri « distance » (défaut API) n'a pas de sens.
+  if (!qs.has('sort') && !qs.has('lat')) qs.set('sort', 'newest');
   const res = await fetch(`${API_URL}/search?${qs.toString()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('search failed');
   return res.json() as Promise<SearchResult>;

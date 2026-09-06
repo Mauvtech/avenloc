@@ -19,6 +19,18 @@ fi
 # Prisma (db push, seed) continue d'utiliser $DATABASE_URL tel quel.
 PSQL_URL=$(printf '%s' "$DATABASE_URL" | sed 's/[?].*//')
 
+# Attend que la base accepte les connexions (jusqu'à ~60 s) avant d'agir.
+i=0
+until psql "$PSQL_URL" -c 'SELECT 1' >/dev/null 2>&1; do
+  i=$((i + 1))
+  if [ "$i" -ge 30 ]; then
+    echo "✗ Base injoignable après 60 s" >&2
+    exit 1
+  fi
+  echo "… attente de la base ($i)"
+  sleep 2
+done
+
 # Dossier d'uploads (volume persistant en prod).
 [ -n "$UPLOADS_DIR" ] && mkdir -p "$UPLOADS_DIR" 2>/dev/null || true
 

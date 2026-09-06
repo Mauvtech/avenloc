@@ -1,8 +1,6 @@
 import type { Quote } from '@/lib/types';
 import { UNIT_LABEL_SHORT } from '@/lib/listing';
-
-const eur = (v: string | number) =>
-  Number(v).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+import { eur } from '@/lib/format';
 
 export default function PriceBreakdown({ quote }: { quote: Quote }) {
   const unit = UNIT_LABEL_SHORT[quote.pricingUnit] ?? 'unité';

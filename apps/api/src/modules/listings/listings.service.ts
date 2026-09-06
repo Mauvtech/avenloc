@@ -219,6 +219,31 @@ export class ListingsService {
     });
   }
 
+  async reorderPhotos(
+    listingId: string,
+    order: string[],
+    currentUser: AuthenticatedUser,
+  ): Promise<ListingPhoto[]> {
+    await this.findAndVerifyOwnership(listingId, currentUser);
+
+    const photos = await this.prisma.listingPhoto.findMany({ where: { listingId } });
+    const ids = new Set(photos.map((p) => p.id));
+    if (order.length !== photos.length || order.some((id) => !ids.has(id))) {
+      throw new BadRequestException('La liste des photos ne correspond pas à l’annonce');
+    }
+
+    await this.prisma.$transaction(
+      order.map((id, position) =>
+        this.prisma.listingPhoto.update({ where: { id }, data: { position } }),
+      ),
+    );
+
+    return this.prisma.listingPhoto.findMany({
+      where: { listingId },
+      orderBy: { position: 'asc' },
+    });
+  }
+
   async deletePhoto(
     listingId: string,
     photoId: string,

@@ -48,12 +48,23 @@ export default function LegalPage({ params }: { params: { doc: string } }) {
     <div className="mx-auto max-w-2xl space-y-6 py-2">
       <BackLink href="/">Accueil</BackLink>
       <h1 className="text-2xl font-extrabold">{doc.title}</h1>
-      <div className="space-y-4">
-        {doc.body.map((p, i) => (
-          <p key={i} className="text-sm leading-relaxed text-ink/80">
-            {p}
-          </p>
-        ))}
+      <div className="card space-y-4 p-6">
+        {doc.body.map((p, i) => {
+          const m = p.match(/^([\wÀ-ÿ' ]{3,40})\s:\s(.+)$/);
+          if (m) {
+            return (
+              <p key={i} className="text-sm leading-relaxed text-ink/80">
+                <span className="font-semibold text-ink">{m[1]} — </span>
+                {m[2]}
+              </p>
+            );
+          }
+          return (
+            <p key={i} className="text-sm leading-relaxed text-ink/80">
+              {p}
+            </p>
+          );
+        })}
       </div>
     </div>
   );

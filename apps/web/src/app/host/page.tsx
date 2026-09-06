@@ -1,13 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api, type ConnectStatus } from '@/lib/api';
 import { isAuthenticated } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
 import { EmptyState, PageHeader, PageLoader } from '@/components/ui';
 import { useConfirm } from '@/components/confirm';
+import { useToast } from '@/components/toast';
+import { eurRound } from '@/lib/format';
 import {
   LISTING_STATUS_CLASS,
   LISTING_STATUS_LABEL,
@@ -29,8 +31,19 @@ type BookingTab = 'pending' | 'upcoming' | 'past' | 'cancelled' | 'all';
 const fdate = (s: string) => new Date(s).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 
 export default function HostDashboardPage() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <HostDashboard />
+    </Suspense>
+  );
+}
+
+function HostDashboard() {
   const router = useRouter();
   const confirm = useConfirm();
+  const toast = useToast();
+  const searchParams = useSearchParams();
+  const createdId = searchParams.get('created');
   const [listings, setListings] = useState<Listing[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [connect, setConnect] = useState<ConnectStatus | null>(null);
@@ -70,6 +83,19 @@ export default function HostDashboardPage() {
       .catch(() => router.replace('/auth/login'))
       .finally(() => setLoading(false));
   }, [router, load]);
+
+  // Après création d'une annonce : met en avant la ligne concernée.
+  useEffect(() => {
+    if (!createdId || listings.length === 0) return;
+    const el = document.getElementById(`listing-${createdId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      toast.info('Annonce en brouillon — publiez-la pour la rendre visible');
+    }
+    // Nettoie le paramètre pour ne pas re-déclencher.
+    router.replace('/host');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createdId, listings.length]);
 
   async function startOnboarding() {
     setOnboarding(true);
@@ -269,34 +295,39 @@ export default function HostDashboardPage() {
               const isBusy = busyId === b.id;
               const endPassed = new Date(b.endDate).getTime() < todayTs;
               return (
-                <div key={b.id} className="card flex flex-wrap items-center gap-3 p-3.5">
-                  <CategoryIcon type={b.listing?.type ?? 'OTHER'} size={20} className="text-brand-fg" />
-                  <div className="min-w-[180px] flex-1">
-                    <div className="text-sm font-bold">{b.listing?.title ?? 'Annonce'}</div>
-                    <div className="text-xs text-muted">
-                      {b.tenant ? `${b.tenant.firstName} ${b.tenant.lastName}` : 'Locataire'} ·{' '}
-                      {fdate(b.startDate)} → {fdate(b.endDate)} · {b.guestCount} loc.
-                      {b.arrivalTime ? ` · arrivée ${b.arrivalTime}` : ''}
+                <div key={b.id} className="card space-y-3 p-3.5">
+                  <div className="flex items-start gap-3">
+                    <CategoryIcon
+                      type={b.listing?.type ?? 'OTHER'}
+                      size={20}
+                      className="mt-0.5 flex-none text-brand-fg"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-bold">{b.listing?.title ?? 'Annonce'}</div>
+                      <div className="text-xs text-muted">
+                        {b.tenant ? `${b.tenant.firstName} ${b.tenant.lastName}` : 'Locataire'} ·{' '}
+                        {fdate(b.startDate)} → {fdate(b.endDate)} · {b.guestCount} pers.
+                        {b.arrivalTime ? ` · arrivée ${b.arrivalTime}` : ''}
+                      </div>
+                      {b.guestNote && (
+                        <div className="mt-0.5 text-xs italic text-muted">« {b.guestNote} »</div>
+                      )}
                     </div>
-                    {b.guestNote && (
-                      <div className="mt-0.5 text-xs italic text-muted">« {b.guestNote} »</div>
-                    )}
+                    <div className="flex-none text-right">
+                      <div className="text-sm font-extrabold">{fmtEUR2(netAmount(b))}</div>
+                      <div className="text-[10px] text-muted">net</div>
+                    </div>
                   </div>
 
-                  <div className="text-right">
-                    <div className="text-sm font-extrabold">{fmtEUR2(netAmount(b))}</div>
-                    <div className="text-[10px] text-muted">net</div>
-                  </div>
-
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      BK_STATUS[b.status]?.cls ?? 'bg-canvas text-muted'
-                    }`}
-                  >
-                    {BK_STATUS[b.status]?.label ?? b.status}
-                  </span>
-
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        BK_STATUS[b.status]?.cls ?? 'bg-canvas text-muted'
+                      }`}
+                    >
+                      {BK_STATUS[b.status]?.label ?? b.status}
+                    </span>
+                    <span className="flex-1" />
                     {b.status === 'PENDING' && (
                       <>
                         <button
@@ -370,28 +401,39 @@ export default function HostDashboardPage() {
               const isBusy = busyId === l.id;
               const rev = revenueByListing.get(l.id);
               return (
-                <div key={l.id} className="card flex flex-wrap items-center gap-3 p-3.5">
-                  <CategoryIcon type={l.type} size={20} className="text-brand-fg" />
-                  <div className="min-w-[160px] flex-1">
-                    <div className="text-sm font-bold">{l.title}</div>
-                    <div className="text-xs text-muted">
-                      {typeLabel(l.type)}
-                      {rev ? ` · ${rev.count} résa · ${fmtEUR(rev.net)}` : ' · aucune réservation'}
+                <div
+                  key={l.id}
+                  id={`listing-${l.id}`}
+                  className={`card space-y-3 p-3.5 transition-shadow ${
+                    createdId === l.id ? 'ring-2 ring-brand' : ''
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <CategoryIcon type={l.type} size={20} className="mt-0.5 flex-none text-brand-fg" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-bold">{l.title}</div>
+                      <div className="text-xs text-muted">
+                        {typeLabel(l.type)}
+                        {rev ? ` · ${rev.count} résa · ${fmtEUR(rev.net)}` : ' · aucune réservation'}
+                      </div>
+                    </div>
+                    <div className="flex-none text-right text-sm font-semibold">
+                      {eurRound(l.basePrice)}
+                      <span className="font-normal text-muted">
+                        /{UNIT_LABEL_SHORT[l.pricingUnit] ?? ''}
+                      </span>
                     </div>
                   </div>
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      LISTING_STATUS_CLASS[l.status] ?? 'bg-canvas text-muted'
-                    }`}
-                  >
-                    {LISTING_STATUS_LABEL[l.status] ?? l.status}
-                  </span>
-                  <div className="w-20 text-right text-sm font-semibold">
-                    {l.basePrice} €
-                    <span className="font-normal text-muted">/{UNIT_LABEL_SHORT[l.pricingUnit] ?? ''}</span>
-                  </div>
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        LISTING_STATUS_CLASS[l.status] ?? 'bg-canvas text-muted'
+                      }`}
+                    >
+                      {LISTING_STATUS_LABEL[l.status] ?? l.status}
+                    </span>
+                    <span className="flex-1" />
                     <Link href={`/listings/${l.id}`} className="btn-ghost px-3 py-2 text-[13px]">
                       Voir
                     </Link>

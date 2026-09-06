@@ -147,6 +147,11 @@ export const api = {
     },
     deletePhoto: (id: string, photoId: string) =>
       apiFetch<void>(`/listings/${id}/photos/${photoId}`, { method: 'DELETE' }),
+    reorderPhotos: (id: string, order: string[]) =>
+      apiFetch<ListingPhoto[]>(`/listings/${id}/photos/reorder`, {
+        method: 'PATCH',
+        body: JSON.stringify({ order }),
+      }),
     // Calendrier de disponibilité
     availability: (id: string) =>
       apiFetch<ListingAvailability[]>(`/listings/${id}/availability`),

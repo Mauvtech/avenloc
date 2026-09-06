@@ -1,4 +1,5 @@
 import type { Booking } from './types';
+import { eur, eurRound } from './format';
 
 const num = (v: string | number | null | undefined): number =>
   typeof v === 'number' ? v : parseFloat(v ?? '') || 0;
@@ -6,17 +7,9 @@ const num = (v: string | number | null | undefined): number =>
 /** Montant net reversé à l'hôte (total encaissé − commission Aven). */
 export const netAmount = (b: Booking): number => num(b.totalAmount) - num(b.serviceFee);
 
-export function fmtEUR(v: number): string {
-  return v.toLocaleString('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  });
-}
-
-export function fmtEUR2(v: number): string {
-  return v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
-}
+// Alias historiques → délèguent au formatage centralisé (lib/format).
+export const fmtEUR = eurRound;
+export const fmtEUR2 = eur;
 
 export interface HostStats {
   revenueNet: number;

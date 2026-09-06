@@ -19,6 +19,7 @@ import { ListingsService } from './listings.service';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { CreateAvailabilityDto, UpdateListingStatusDto } from './dto/availability.dto';
+import { ReorderPhotosDto } from './dto/reorder-photos.dto';
 import type { ListingResponseDto } from './dto/listing-response.dto';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/common/guards/roles.guard';
@@ -98,6 +99,16 @@ export class ListingsController {
   ): Promise<ListingPhoto> {
     if (!file) throw new BadRequestException('Aucun fichier reçu');
     return this.listingsService.uploadPhoto(id, file.buffer, file.originalname, file.mimetype, user);
+  }
+
+  @Patch(':id/photos/reorder')
+  @UseGuards(JwtAuthGuard)
+  reorderPhotos(
+    @Param('id') id: string,
+    @Body() dto: ReorderPhotosDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ListingPhoto[]> {
+    return this.listingsService.reorderPhotos(id, dto.order, user);
   }
 
   @Delete(':id/photos/:photoId')

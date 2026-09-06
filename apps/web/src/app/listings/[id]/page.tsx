@@ -240,7 +240,7 @@ export default function ListingPage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={p.url}
-                alt={listing.title}
+                alt={i === 0 ? listing.title : ''}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
               />
             </button>

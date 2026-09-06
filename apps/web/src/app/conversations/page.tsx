@@ -35,7 +35,11 @@ export default function ConversationsPage() {
       .then(([me, cs]) => {
         setMeId(me?.id ?? null);
         setConversations(cs);
-        if (cs.length > 0) selectConversation(cs[0]);
+        // Auto-ouverture du 1er fil sur desktop uniquement ; sur mobile on
+        // laisse la liste visible.
+        if (cs.length > 0 && window.matchMedia('(min-width: 640px)').matches) {
+          selectConversation(cs[0]);
+        }
       })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,9 +85,11 @@ export default function ConversationsPage() {
           Une conversation s’ouvre automatiquement dès qu’une réservation est confirmée.
         </EmptyState>
       ) : (
-        <div className="grid h-[600px] grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid h-[70vh] min-h-[520px] grid-cols-1 gap-4 sm:grid-cols-3">
           {/* Liste */}
-          <div className="card col-span-1 overflow-y-auto">
+          <div
+            className={`card col-span-1 overflow-y-auto ${active ? 'hidden sm:block' : 'block'}`}
+          >
             {conversations.map((c) => (
               <button
                 key={c.id}
@@ -112,10 +118,21 @@ export default function ConversationsPage() {
           </div>
 
           {/* Fil */}
-          <div className="card col-span-1 flex flex-col sm:col-span-2">
+          <div
+            className={`card col-span-1 flex-col sm:col-span-2 sm:flex ${
+              active ? 'flex' : 'hidden'
+            }`}
+          >
             {active ? (
               <>
                 <div className="flex items-center gap-3 border-b border-line p-3">
+                  <button
+                    onClick={() => setActive(null)}
+                    className="flex h-8 w-8 flex-none items-center justify-center rounded-md text-muted hover:bg-canvas hover:text-ink sm:hidden"
+                    aria-label="Retour à la liste"
+                  >
+                    ←
+                  </button>
                   <Avatar src={active.otherParty?.avatarUrl} name={partyName(active)} size={36} />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-bold">{partyName(active)}</div>
