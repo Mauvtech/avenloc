@@ -41,7 +41,8 @@ export default function DevToolbar() {
   }
 
   return (
-    <div className="fixed bottom-3 left-3 z-[100] font-sans text-sm">
+    // Remonté sur mobile pour ne pas passer sous la barre d'action des fiches annonce.
+    <div className="fixed bottom-20 left-3 z-[120] font-sans text-sm md:bottom-3">
       {open ? (
         <div className="w-64 rounded-lg border border-line bg-surface p-3 shadow-modal">
           <div className="mb-2 flex items-center justify-between">

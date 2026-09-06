@@ -74,6 +74,18 @@ export default function Nav() {
     };
   }, [drawerOpen]);
 
+  useEffect(() => {
+    if (!drawerOpen && !menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setDrawerOpen(false);
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [drawerOpen, menuOpen]);
+
   async function handleLogout() {
     const refreshToken = getRefreshToken();
     if (refreshToken) await api.auth.logout(refreshToken).catch(() => {});

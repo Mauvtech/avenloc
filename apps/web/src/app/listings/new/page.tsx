@@ -6,10 +6,12 @@ import { api } from '@/lib/api';
 import { isAuthenticated } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
 import AddressAutocomplete from '@/components/address-autocomplete';
+import { BackLink } from '@/components/ui';
 import type { GeoResult } from '@/lib/geo';
 import {
   CANCELLATION_LABEL,
   CANCELLATION_POLICIES,
+  capacityNoun,
   LISTING_TYPES,
   PRICING_UNITS,
   UNIT_LABEL_SHORT,
@@ -146,9 +148,7 @@ export default function NewListingPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <button onClick={() => router.back()} className="text-sm text-muted hover:text-ink">
-        ← Annuler
-      </button>
+      <BackLink href="/host">Retour à mes annonces</BackLink>
       <h1 className="text-2xl font-extrabold">Nouvelle annonce</h1>
 
       <form onSubmit={handleSubmit} className="space-y-8">
@@ -288,7 +288,7 @@ export default function NewListingPage() {
               />
             </div>
             <div>
-              <label className="label">Nombre de locataires max</label>
+              <label className="label">Capacité max ({capacityNoun(form.type)})</label>
               <input type="number" min="1" value={form.maxGuests} onChange={set('maxGuests')} className="field" />
             </div>
             <div>

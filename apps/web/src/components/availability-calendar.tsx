@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { addDays, daysBetween, fromISO, toISO } from '@/lib/calendar';
 import MonthCalendar from '@/components/month-calendar';
+import { PageLoader } from '@/components/ui';
 
 interface Props {
   listingId: string;
@@ -48,7 +49,7 @@ export default function AvailabilityCalendar({ listingId }: Props) {
     }
   }
 
-  if (loading) return <p className="py-8 text-center text-muted">Chargement…</p>;
+  if (loading) return <PageLoader label="Chargement du calendrier…" />;
 
   return (
     <div className="space-y-3">

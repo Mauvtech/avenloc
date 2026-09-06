@@ -21,7 +21,7 @@ function toItem(l: Listing): SearchResultItem {
     pricingUnit: l.pricingUnit,
     maxGuests: l.maxGuests,
     amenities: l.amenities,
-    coverPhotoUrl: l.photos[0]?.url ?? null,
+    coverPhotoUrl: l.photos?.[0]?.url ?? null,
     rating: null,
     reviewCount: 0,
   };

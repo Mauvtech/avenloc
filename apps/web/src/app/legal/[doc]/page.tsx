@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { BackLink } from '@/components/ui';
 
 const DOCS: Record<string, { title: string; body: string[] }> = {
   terms: {
@@ -46,9 +46,7 @@ export default function LegalPage({ params }: { params: { doc: string } }) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 py-2">
-      <Link href="/" className="text-sm text-muted hover:text-ink">
-        ← Accueil
-      </Link>
+      <BackLink href="/">Accueil</BackLink>
       <h1 className="text-2xl font-extrabold">{doc.title}</h1>
       <div className="space-y-4">
         {doc.body.map((p, i) => (

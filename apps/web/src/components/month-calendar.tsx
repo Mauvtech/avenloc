@@ -92,7 +92,7 @@ export default function MonthCalendar({
                       !inMonth
                         ? 'invisible'
                         : disabled
-                          ? 'cursor-not-allowed text-line line-through'
+                          ? 'cursor-not-allowed text-muted/40 line-through'
                           : 'hover:bg-canvas'
                     } ${dayClassName?.(iso) ?? ''}`}
                   >

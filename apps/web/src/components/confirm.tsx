@@ -51,7 +51,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     confirmBtnRef.current?.focus();
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') close(false);
-      if (e.key === 'Enter') close(true);
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
