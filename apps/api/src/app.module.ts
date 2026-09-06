@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { configuration } from './config/configuration';
+import { HealthController } from './health.controller';
 import { DatabaseModule } from './infrastructure/database/database.module';
 import { CacheModule } from './infrastructure/cache/cache.module';
 import { StorageModule } from './infrastructure/storage/storage.module';
@@ -36,5 +37,6 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     MessagingModule,
     ReviewsModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

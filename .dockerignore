@@ -1,0 +1,23 @@
+# Contexte de build Docker = racine du repo. On exclut tout ce qui est lourd
+# ou sensible ; les Dockerfiles réinstallent les dépendances proprement.
+
+**/node_modules
+**/dist
+**/.next
+**/coverage
+**/*.tsbuildinfo
+
+# Uploads locaux (stockage disque de dev)
+apps/api/uploads
+
+# Secrets — ne jamais envoyer dans une image
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Divers
+.git
+.github
+**/*.log
+Design.zip
+.claude

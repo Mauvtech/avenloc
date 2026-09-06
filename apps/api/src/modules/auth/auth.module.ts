@@ -21,7 +21,20 @@ import { GoogleStrategy } from './strategies/google.strategy';
       inject: [ConfigService],
     }),
   ],
-  providers: [AuthService, JwtStrategy, GoogleStrategy],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    // La stratégie Google n'est enregistrée que si OAuth est configuré :
+    // sans GOOGLE_CLIENT_ID, passport-oauth2 lève une erreur au démarrage.
+    {
+      provide: GoogleStrategy,
+      useFactory: (config: ConfigService) =>
+        config.get<string>('google.clientId')
+          ? new GoogleStrategy(config)
+          : null,
+      inject: [ConfigService],
+    },
+  ],
   controllers: [AuthController],
   exports: [AuthService, JwtModule],
 })
