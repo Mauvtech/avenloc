@@ -1,0 +1,26 @@
+node_modules/
+dist/
+apps/api/uploads/
+.next/
+coverage/
+*.tsbuildinfo
+
+# Variables d'environnement — NE JAMAIS COMMITER
+.env
+.env.local
+.env.*.local
+apps/api/.env
+apps/web/.env.local
+
+# Prisma
+apps/api/prisma/migrations/**/migration.sql
+
+# Éditeur / outillage local
+.claude/settings.local.json
+.idea/
+.vscode/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

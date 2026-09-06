@@ -1,0 +1,21 @@
+{
+  "name": "aven",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @aven/api dev",
+    "dev:web": "pnpm --filter @aven/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter @aven/api prisma migrate dev",
+    "db:studio": "pnpm --filter @aven/api prisma studio"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

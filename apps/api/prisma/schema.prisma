@@ -1,0 +1,436 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+/// Seed: pnpm --filter @aven/api exec ts-node prisma/seed.ts
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis, btree_gist, pgcrypto]
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+}
+
+enum UserRole {
+  TENANT
+  HOST
+}
+
+enum IdentityStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+}
+
+enum ListingType {
+  APARTMENT
+  HOUSE
+  ROOM
+  OFFICE
+  MEETING_ROOM
+  WORKSHOP
+  WAREHOUSE
+  EVENT_SPACE
+  PARKING
+  OTHER
+}
+
+enum PricingUnit {
+  NIGHT
+  HOUR
+  DAY
+}
+
+enum CancellationPolicy {
+  FLEXIBLE       // remboursement si annulation > 24h avant
+  MODERATE       // remboursement si annulation > 5 jours avant
+  STRICT         // remboursement 50% si annulation > 7 jours avant
+  NON_REFUNDABLE
+}
+
+enum ListingStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  CAPTURED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  FAILED
+}
+
+enum MessageSenderRole {
+  TENANT
+  HOST
+}
+
+enum ReviewTarget {
+  LISTING // locataire note le local
+  TENANT  // hôte note le locataire
+}
+
+// ─── USERS ────────────────────────────────────────────────────────────────────
+
+model User {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email          String         @unique
+  hashedPassword String?        // null si OAuth uniquement
+  firstName      String
+  lastName       String
+  avatarUrl      String?
+  bio            String?
+  phone          String?
+  roles          UserRole[]     @default([TENANT])
+  identityStatus IdentityStatus @default(UNVERIFIED)
+  identityData   Json?          // stub KYC : champs réservés, non implémentés en V1
+
+  // Stripe Connect (rôle hôte)
+  stripeAccountId     String? @unique
+  stripeAccountStatus String? // "pending" | "active" | "restricted"
+  payoutLast4         String? // 4 derniers chiffres de l'IBAN de versement
+  payoutHolderName    String? // titulaire du compte bancaire
+
+  // Stripe (rôle locataire)
+  stripeCustomerId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  oauthAccounts    OAuthAccount[]
+  refreshTokens    RefreshToken[]
+  listings         Listing[]
+  bookingsAsTenant Booking[]      @relation("TenantBookings")
+  sentMessages     Message[]
+  reviews          Review[]       @relation("ReviewAuthor")
+  receivedReviews  Review[]       @relation("ReviewSubject")
+
+  conversationsAsTenant Conversation[] @relation("ConversationTenant")
+  conversationsAsHost   Conversation[] @relation("ConversationHost")
+
+  @@index([email])
+}
+
+model OAuthAccount {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String       @db.Uuid
+  provider          AuthProvider
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model RefreshToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique // SHA-256 du token brut stocké, jamais le token en clair
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── PLATFORM CONFIG ──────────────────────────────────────────────────────────
+
+// Singleton : une seule ligne en production (id = 'default').
+// Modifiable par un admin via API protégée — pas de migration si le taux global change.
+// Lecture mise en cache Redis (clé "platform:config", TTL 5 min) — invalidée à chaque update.
+model PlatformConfig {
+  id                     String   @id @default("default")
+  serviceFeeRate         Decimal  @db.Decimal(5, 4) @default(0.1200) // 12% par défaut
+  taxRate                Decimal  @db.Decimal(5, 4) @default(0.2000) // TVA 20% par défaut
+  currency               String   @default("EUR")
+  // Fenêtre de validation hôte (en heures) pour les réservations non-instant-book.
+  // Au-delà, le job de nettoyage annule automatiquement la réservation PENDING.
+  hostApprovalWindowHours Int     @default(24)
+  updatedAt              DateTime @updatedAt
+}
+
+// Snapshot horodaté à chaque modification de PlatformConfig.
+// Source de vérité pour les audits comptables et légaux sur les taux appliqués.
+// Jamais modifiée ni supprimée (append-only).
+model PlatformConfigHistory {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  serviceFeeRate         Decimal  @db.Decimal(5, 4)
+  taxRate                Decimal  @db.Decimal(5, 4)
+  hostApprovalWindowHours Int
+  currency               String
+  changedAt              DateTime @default(now())
+  changedBy              String?  @db.Uuid // userId admin — null si changement système
+}
+
+// ─── LISTINGS ─────────────────────────────────────────────────────────────────
+
+model Listing {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hostId      String        @db.Uuid
+  type        ListingType
+  status      ListingStatus @default(DRAFT)
+
+  title       String
+  description String
+
+  // Adresse
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  postalCode   String
+  country      String @default("FR")
+
+  // Coordonnées stockées en Float pour Prisma ORM.
+  // Une colonne PostGIS `location geometry(Point, 4326)` est maintenue en synchrone
+  // via un trigger SQL (INSERT + UPDATE) — voir migration 0002_postgis_geometry.sql.
+  latitude  Float
+  longitude Float
+
+  // Capacité humaine, uniquement pour les types habitables (APARTMENT, HOUSE, ROOM).
+  // Pour les surfaces (m²), places de parking, hauteur sous plafond → specificAttributes.
+  maxGuests Int?
+
+  pricingUnit PricingUnit
+  basePrice   Decimal     @db.Decimal(10, 2)
+  cleaningFee Decimal?    @db.Decimal(10, 2)
+
+  // Override ponctuel du taux de commission.
+  // Si null → on utilise PlatformConfig.serviceFeeRate au moment du calcul.
+  // Permet des taux négociés par annonce ou par palier d'hôte sans migrer toutes les lignes.
+  serviceFeeRateOverride Decimal? @db.Decimal(5, 4)
+
+  cancellationPolicy CancellationPolicy @default(MODERATE)
+
+  // Instant Book : si true, la réservation est confirmée automatiquement dès paiement autorisé.
+  // Si false : statut PENDING jusqu'à validation explicite de l'hôte (voir Booking.hostApprovalDeadline).
+  // Impact Stripe : false → capture_method: 'manual' sur le PaymentIntent (autorisation différée).
+  instantBookEnabled Boolean @default(false)
+
+  // Tags normalisés — valeurs contrôlées par une enum applicative (non Prisma)
+  amenities String[]
+
+  // Attributs spécifiques au type de local — exemples par type :
+  //   APARTMENT / HOUSE  : { "floor": 3, "elevator": true, "balcony": false }
+  //   MEETING_ROOM       : { "projector": true, "whiteboard": true, "capacity_persons": 12 }
+  //   WAREHOUSE          : { "surface_m2": 500, "height_m": 6.5, "loading_dock": true }
+  //   PARKING            : { "spots": 2, "covered": true, "ev_charger": false }
+  //   OFFICE             : { "surface_m2": 25, "standing_desk": true }
+  specificAttributes Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  host           User                  @relation(fields: [hostId], references: [id])
+  photos         ListingPhoto[]
+  availabilities ListingAvailability[]
+  bookings       Booking[]
+  reviews        Review[]
+  conversations  Conversation[]
+
+  @@index([hostId])
+  @@index([type])
+  @@index([city])
+  @@index([basePrice])
+  @@index([status])
+}
+
+model ListingPhoto {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  listingId String   @db.Uuid
+  url       String   // clé S3 (pas l'URL signée — celle-ci est générée à la volée)
+  position  Int      @default(0)
+  caption   String?
+  createdAt DateTime @default(now())
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+}
+
+// Fenêtres de disponibilité définies par l'hôte.
+// isAvailable = false → blocage manuel (déplacement personnel, travaux, etc.)
+model ListingAvailability {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  listingId   String   @db.Uuid
+  startDate   DateTime @db.Date
+  endDate     DateTime @db.Date // exclusif, même convention que Booking
+  isAvailable Boolean  @default(true)
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+}
+
+// ─── BOOKINGS ─────────────────────────────────────────────────────────────────
+
+model Booking {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  listingId String        @db.Uuid
+  tenantId  String        @db.Uuid
+  status    BookingStatus @default(PENDING)
+
+  // Convention endDate EXCLUSIF : la réservation couvre [startDate, endDate[.
+  // Exemple : du 10 au 12 juillet = startDate 2024-07-10, endDate 2024-07-12 → 2 nuits.
+  // Contrainte CHECK (startDate < endDate) garantie en migration brute (0003).
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+
+  // unitCount = nombre d'unités facturées (nuits, heures ou jours).
+  // L'interprétation dépend de Listing.pricingUnit — pas de champ redondant "nights".
+  unitCount Int
+
+  // ── Snapshot financier ──────────────────────────────────────────────────────
+  // Ces montants sont figés au moment où la réservation passe en CONFIRMED.
+  // Ils ne changent pas si l'hôte modifie son annonce après coup.
+  //
+  // Booking.serviceFee : montant calculé par la logique métier au moment de la réservation.
+  // Payment.platformFee : montant effectivement prélevé par Stripe lors de la capture.
+  // Les deux coexistent volontairement — voir ARCHITECTURE.md §"Booking vs Payment".
+  baseAmount  Decimal @db.Decimal(10, 2)
+  cleaningFee Decimal @db.Decimal(10, 2) @default(0)
+  serviceFee  Decimal @db.Decimal(10, 2)
+  taxAmount   Decimal @db.Decimal(10, 2) @default(0)
+  totalAmount Decimal @db.Decimal(10, 2)
+
+  guestCount  Int     @default(1)
+  guestNote   String? // message / instructions du locataire pour l'hôte
+  arrivalTime String? // heure d'arrivée prévue (ex. "14:30")
+
+  // Deadline de validation hôte. Null si Listing.instantBookEnabled = true.
+  // Calculé à la création : now() + PlatformConfig.hostApprovalWindowHours.
+  // Le job de nettoyage annule les PENDING dont hostApprovalDeadline est dépassée.
+  hostApprovalDeadline DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listing  Listing   @relation(fields: [listingId], references: [id])
+  tenant   User      @relation("TenantBookings", fields: [tenantId], references: [id])
+  payment  Payment?
+  messages Message[]
+  reviews  Review[]
+
+  @@index([listingId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([listingId, startDate, endDate])
+}
+
+// ─── PAYMENTS ─────────────────────────────────────────────────────────────────
+
+model Payment {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId String        @unique @db.Uuid
+  status    PaymentStatus @default(PENDING)
+
+  stripePaymentIntentId String? @unique
+  stripeTransferId      String? // Transfer Stripe vers le compte Connect de l'hôte
+  stripeRefundId        String?
+
+  amount         Decimal @db.Decimal(10, 2) // = Booking.totalAmount
+  platformFee    Decimal @db.Decimal(10, 2) // commission effectivement prélevée par Stripe
+  hostPayout     Decimal @db.Decimal(10, 2) // = amount - platformFee (net reçu par l'hôte)
+  refundedAmount Decimal @db.Decimal(10, 2) @default(0)
+
+  currency   String    @default("EUR")
+  capturedAt DateTime?
+  refundedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+}
+
+// ─── MESSAGING ────────────────────────────────────────────────────────────────
+
+model Conversation {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId String?  @unique @db.Uuid // null = conversation pré-réservation (question sur l'annonce)
+  listingId String   @db.Uuid
+  tenantId  String   @db.Uuid
+  hostId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  messages Message[]
+  listing  Listing @relation(fields: [listingId], references: [id])
+  tenant   User    @relation("ConversationTenant", fields: [tenantId], references: [id])
+  host     User    @relation("ConversationHost", fields: [hostId], references: [id])
+
+  @@index([tenantId])
+  @@index([hostId])
+  @@index([listingId])
+}
+
+model Message {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId String            @db.Uuid
+  senderId       String            @db.Uuid
+  senderRole     MessageSenderRole
+  content        String
+  readAt         DateTime?
+  createdAt      DateTime          @default(now())
+  bookingId      String?           @db.Uuid
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  sender       User         @relation(fields: [senderId], references: [id])
+  booking      Booking?     @relation(fields: [bookingId], references: [id])
+
+  @@index([conversationId])
+  @@index([senderId])
+}
+
+// ─── REVIEWS ──────────────────────────────────────────────────────────────────
+
+model Review {
+  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId String       @db.Uuid
+  authorId  String       @db.Uuid
+  target    ReviewTarget
+
+  rating   Int     // 1 à 5 — validé au niveau applicatif (1 ≤ rating ≤ 5)
+  comment  String?
+  isPublic Boolean @default(true)
+
+  // Relation polymorphique : exactement l'un des deux est non-null selon target.
+  //   target = LISTING → listingId non-null, tenantSubjectId null
+  //   target = TENANT  → tenantSubjectId non-null, listingId null
+  // Invariant vérifié au niveau service, pas de contrainte CHECK en base
+  // (PostgreSQL ne supporte pas les CHECK inter-colonnes avec FK).
+  listingId       String? @db.Uuid
+  tenantSubjectId String? @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  booking       Booking  @relation(fields: [bookingId], references: [id])
+  author        User     @relation("ReviewAuthor", fields: [authorId], references: [id])
+  listing       Listing? @relation(fields: [listingId], references: [id])
+  tenantSubject User?    @relation("ReviewSubject", fields: [tenantSubjectId], references: [id])
+
+  // Un seul avis par booking et par direction (locataire→local ou hôte→locataire)
+  @@unique([bookingId, authorId, target])
+  @@index([bookingId])
+  @@index([authorId])
+  @@index([listingId])
+}
