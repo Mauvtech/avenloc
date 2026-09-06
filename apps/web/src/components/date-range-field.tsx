@@ -45,27 +45,25 @@ export default function DateRangeField({ startDate, endDate, onChange }: Props) 
 
   return (
     <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="field flex items-center justify-between text-left"
-      >
-        <span className={startDate ? 'text-ink' : 'text-muted/70'}>{label}</span>
+      <div className="field flex items-center justify-between p-0">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex-1 px-3 py-2.5 text-left"
+        >
+          <span className={startDate ? 'text-ink' : 'text-muted/70'}>{label}</span>
+        </button>
         {startDate && (
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => {
-              e.stopPropagation();
-              onChange({ startDate: '', endDate: '' });
-            }}
-            className="ml-2 text-muted hover:text-ink"
+          <button
+            type="button"
+            onClick={() => onChange({ startDate: '', endDate: '' })}
+            className="px-3 text-muted hover:text-ink"
             aria-label="Effacer les dates"
           >
             ✕
-          </span>
+          </button>
         )}
-      </button>
+      </div>
       {open && (
         <div className="absolute left-0 top-full z-30 mt-1 w-[min(20rem,90vw)] rounded-lg border border-line bg-surface p-3 shadow-modal">
           <MonthCalendar
