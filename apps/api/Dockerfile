@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # Image de l'API NestJS. Contexte de build attendu : racine du repo.
 #   docker build -f apps/api/Dockerfile -t aven-api .
 
@@ -17,8 +16,7 @@ WORKDIR /app
 FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/api/package.json apps/api/package.json
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --filter @aven/api...
+RUN pnpm install --frozen-lockfile --filter @aven/api...
 
 # ── Build (prisma generate + nest build) ─────────────────────────────────────
 FROM deps AS build

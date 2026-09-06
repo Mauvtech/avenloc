@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # Image du front Next.js (sortie standalone). Contexte de build : racine du repo.
 #   docker build -f apps/web/Dockerfile \
 #     --build-arg NEXT_PUBLIC_API_URL=https://<api>/api/v1 -t aven-web .
@@ -14,8 +13,7 @@ WORKDIR /app
 FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/web/package.json apps/web/package.json
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --filter @aven/web...
+RUN pnpm install --frozen-lockfile --filter @aven/web...
 
 # ── Build ───────────────────────────────────────────────────────────────────
 FROM deps AS build
