@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '@/infrastructure/database/prisma.service';
+import { RedisService } from '@/infrastructure/cache/redis.service';
 import type { User } from '@prisma/client';
 
 jest.mock('bcrypt');
@@ -88,6 +89,14 @@ describe('AuthService', () => {
               if (key === 'jwt.refreshTtlSeconds') return 2592000;
               return null;
             }),
+          },
+        },
+        {
+          provide: RedisService,
+          useValue: {
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue(undefined),
+            del: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],

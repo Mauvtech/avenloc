@@ -11,6 +11,7 @@ import type {
   ReviewList,
   SearchResult,
   Quote,
+  Deposit,
   RegisterData,
   LoginData,
 } from './types';
@@ -189,6 +190,29 @@ export const api = {
       apiFetch<Booking>(`/bookings/${id}/cancel`, { method: 'POST' }),
     quote: (data: { listingId: string; startDate: string; endDate: string }) =>
       apiFetch<Quote>('/bookings/quote', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  deposits: {
+    get: (bookingId: string) => apiFetch<Deposit | null>(`/bookings/${bookingId}/deposit`),
+    claim: (
+      bookingId: string,
+      data: { reason: string; amount: string; description: string },
+      files: File[],
+    ) => {
+      const fd = new FormData();
+      fd.append('reason', data.reason);
+      fd.append('amount', data.amount);
+      fd.append('description', data.description);
+      files.forEach((f) => fd.append('files', f));
+      return apiFetch<{ ok: true }>(`/bookings/${bookingId}/deposit/claim`, {
+        method: 'POST',
+        body: fd,
+      });
+    },
+    respond: (bookingId: string, decision: 'accept' | 'contest', contestReason?: string) =>
+      apiFetch<{ ok: true }>(`/bookings/${bookingId}/deposit/respond`, {
+        method: 'POST',
+        body: JSON.stringify({ decision, contestReason }),
+      }),
   },
   conversations: {
     list: () => apiFetch<Conversation[]>('/conversations'),

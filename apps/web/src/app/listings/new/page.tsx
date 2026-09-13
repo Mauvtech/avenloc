@@ -45,6 +45,7 @@ export default function NewListingPage() {
     pricingUnit: 'NIGHT',
     basePrice: '',
     cleaningFee: '',
+    depositAmount: '',
     cancellationPolicy: 'MODERATE',
     instantBookEnabled: false,
     amenities: '',
@@ -160,6 +161,7 @@ export default function NewListingPage() {
         pricingUnit: form.pricingUnit,
         basePrice: parseFloat(form.basePrice),
         cleaningFee: form.cleaningFee ? parseFloat(form.cleaningFee) : undefined,
+        depositAmount: form.depositAmount ? parseFloat(form.depositAmount) : undefined,
         cancellationPolicy: form.cancellationPolicy,
         instantBookEnabled: form.instantBookEnabled,
         amenities: form.amenities
@@ -326,7 +328,7 @@ export default function NewListingPage() {
                 />
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label className="label">Frais de ménage (€)</label>
                 <input
@@ -346,6 +348,18 @@ export default function NewListingPage() {
                   value={form.maxGuests}
                   onChange={set('maxGuests')}
                   className="field"
+                />
+              </div>
+              <div>
+                <label className="label">Caution (€)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.depositAmount}
+                  onChange={set('depositAmount')}
+                  className="field"
+                  placeholder="Aucune"
                 />
               </div>
               <div>
@@ -478,6 +492,7 @@ export default function NewListingPage() {
                 }
               />
               {amenList.length > 0 && <Recap k="Équipements" v={amenList.join(', ')} />}
+              <Recap k="Caution" v={form.depositAmount ? eur(form.depositAmount) : 'Aucune'} />
               <Recap k="Photos" v={`${photos.length}`} />
               <Recap
                 k="Réservation"

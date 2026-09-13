@@ -20,4 +20,6 @@ export class QuoteResponseDto {
   serviceFee: string = '0';
   taxAmount: string = '0';
   totalAmount: string = '0';
+  /** Caution (empreinte bancaire), non incluse dans totalAmount — null = aucune. */
+  depositAmount: string | null = null;
 }

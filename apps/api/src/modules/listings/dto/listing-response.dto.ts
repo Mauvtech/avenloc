@@ -25,6 +25,7 @@ export class ListingResponseDto {
   pricingUnit: PricingUnit;
   basePrice: string; // Decimal serialized as string
   cleaningFee: string | null;
+  depositAmount: string | null;
   serviceFeeRateOverride: string | null;
   cancellationPolicy: CancellationPolicy;
   instantBookEnabled: boolean;
@@ -34,7 +35,7 @@ export class ListingResponseDto {
   updatedAt: Date;
   photos: ListingPhoto[];
   availabilities?: ListingAvailability[];
-  /** true si l'hôte a finalisé sa configuration de versements (compte Stripe actif). */
+  /** true si l'hôte a finalisé sa configuration d'encaissement (compte Stripe actif). */
   hostPaymentsReady: boolean;
   host: {
     id: string;

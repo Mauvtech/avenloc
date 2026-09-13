@@ -34,6 +34,9 @@ const mockConversation = {
   hostId: HOST_ID,
   createdAt: new Date(),
   messages: [],
+  listing: { title: 'Bel appartement' },
+  tenant: { id: TENANT_ID, firstName: 'Tenant', lastName: 'User', avatarUrl: null },
+  host: { id: HOST_ID, firstName: 'Host', lastName: 'User', avatarUrl: null },
 };
 
 describe('MessagingService', () => {
@@ -111,6 +114,7 @@ describe('MessagingService', () => {
       readAt: null,
       createdAt: new Date(),
       bookingId: null,
+      sender: { id: TENANT_ID, firstName: 'Tenant', lastName: 'User', avatarUrl: null },
     };
 
     it('envoie un message et retourne le MessageResponseDto', async () => {

@@ -86,6 +86,13 @@ export class CreateListingDto {
   @Type(() => Number)
   cleaningFee?: number;
 
+  // Caution demandée au locataire (empreinte, non facturée). Null = aucune.
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Type(() => Number)
+  depositAmount?: number;
+
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 4 })
   @Min(0)

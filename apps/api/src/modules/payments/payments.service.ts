@@ -13,6 +13,7 @@ import Stripe from 'stripe';
 import { PrismaService } from '@/infrastructure/database/prisma.service';
 import { FeaturesService } from '@/modules/features/features.service';
 import { MessagingService } from '@/modules/messaging/messaging.service';
+import { DepositsService } from '@/modules/deposits/deposits.service';
 import { StripeClient } from './stripe/stripe.client';
 import {
   PaymentIntentResponseDto,
@@ -36,6 +37,7 @@ export class PaymentsService {
     private readonly config: ConfigService,
     private readonly features: FeaturesService,
     private readonly messaging: MessagingService,
+    private readonly deposits: DepositsService,
   ) {}
 
   private get stripe(): Stripe {
@@ -368,6 +370,7 @@ export class PaymentsService {
       await this.messaging
         .ensureBookingConversation(booking.id)
         .catch(() => undefined);
+      await this.deposits.authorizeForBooking(booking.id).catch(() => undefined);
       return new PaymentIntentResponseDto({
         clientSecret: null,
         paymentIntentId: `sim_pi_${booking.id}`,
@@ -487,6 +490,7 @@ export class PaymentsService {
       }),
     ]);
     await this.messaging.ensureBookingConversation(bookingId).catch(() => undefined);
+    await this.deposits.authorizeForBooking(bookingId).catch(() => undefined);
   }
 
   // ── Stripe webhook handlers ──────────────────────────────────────────────────
@@ -610,6 +614,7 @@ export class PaymentsService {
       }),
     ]);
     await this.messaging.ensureBookingConversation(bookingId).catch(() => undefined);
+    await this.deposits.authorizeForBooking(bookingId).catch(() => undefined);
   }
 
   private async handleAmountCapturableUpdated(

@@ -35,6 +35,7 @@ const mockListing: Listing & { photos: []; availabilities: [] } = {
   pricingUnit: PricingUnit.NIGHT,
   basePrice: 100 as unknown as Listing['basePrice'],
   cleaningFee: null,
+  depositAmount: null,
   serviceFeeRateOverride: null,
   cancellationPolicy: CancellationPolicy.MODERATE,
   instantBookEnabled: false,

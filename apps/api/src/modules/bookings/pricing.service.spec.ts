@@ -27,6 +27,7 @@ const baseListing: Listing = {
   pricingUnit: 'NIGHT',
   basePrice: makeDecimal(100),
   cleaningFee: makeDecimal(20),
+  depositAmount: null,
   serviceFeeRateOverride: null,
   cancellationPolicy: 'MODERATE',
   instantBookEnabled: false,

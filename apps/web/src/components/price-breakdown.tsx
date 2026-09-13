@@ -23,6 +23,12 @@ export default function PriceBreakdown({ quote }: { quote: Quote }) {
         <span>Total</span>
         <span className="tabular-nums">{eur(quote.totalAmount)}</span>
       </div>
+      {quote.depositAmount && Number(quote.depositAmount) > 0 && (
+        <p className="border-t border-line pt-2 text-xs text-muted">
+          + caution de <span className="font-semibold text-ink">{eur(quote.depositAmount)}</span> :
+          empreinte bancaire, jamais débitée sauf réclamation justifiée de l&apos;hôte.
+        </p>
+      )}
     </div>
   );
 }

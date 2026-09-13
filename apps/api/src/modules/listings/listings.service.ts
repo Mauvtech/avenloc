@@ -64,6 +64,7 @@ export class ListingsService {
         pricingUnit: dto.pricingUnit,
         basePrice: dto.basePrice,
         cleaningFee: dto.cleaningFee,
+        depositAmount: dto.depositAmount,
         serviceFeeRateOverride: dto.serviceFeeRateOverride,
         cancellationPolicy: dto.cancellationPolicy,
         instantBookEnabled: dto.instantBookEnabled ?? false,
@@ -153,6 +154,7 @@ export class ListingsService {
         ...(dto.pricingUnit !== undefined && { pricingUnit: dto.pricingUnit }),
         ...(dto.basePrice !== undefined && { basePrice: dto.basePrice }),
         ...(dto.cleaningFee !== undefined && { cleaningFee: dto.cleaningFee }),
+        ...(dto.depositAmount !== undefined && { depositAmount: dto.depositAmount }),
         ...(dto.serviceFeeRateOverride !== undefined && {
           serviceFeeRateOverride: dto.serviceFeeRateOverride,
         }),
@@ -376,6 +378,7 @@ export class ListingsService {
       pricingUnit: listing.pricingUnit,
       basePrice: listing.basePrice.toString(),
       cleaningFee: listing.cleaningFee?.toString() ?? null,
+      depositAmount: listing.depositAmount?.toString() ?? null,
       serviceFeeRateOverride: listing.serviceFeeRateOverride?.toString() ?? null,
       cancellationPolicy: listing.cancellationPolicy,
       instantBookEnabled: listing.instantBookEnabled,
@@ -385,7 +388,7 @@ export class ListingsService {
       updatedAt: listing.updatedAt,
       photos: listing.photos,
       availabilities: listing.availabilities,
-      // L'hôte a-t-il finalisé ses versements ? (ou flag démo « simulatePayments »)
+      // L'hôte a-t-il finalisé son encaissement ? (ou flag démo « simulatePayments »)
       hostPaymentsReady:
         this.features.isOn('simulatePayments') ||
         listing.host?.stripeAccountStatus === 'active',

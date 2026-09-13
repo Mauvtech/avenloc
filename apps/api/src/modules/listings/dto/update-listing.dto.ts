@@ -61,6 +61,9 @@ export class UpdateListingDto {
   @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Type(() => Number)
   cleaningFee?: number;
 
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Type(() => Number)
+  depositAmount?: number;
+
   @IsOptional() @IsNumber({ maxDecimalPlaces: 4 }) @Min(0) @Max(1) @Type(() => Number)
   serviceFeeRateOverride?: number;
 

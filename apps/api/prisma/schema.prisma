@@ -81,6 +81,18 @@ enum MessageSenderRole {
   HOST
 }
 
+// Cycle de vie de la caution (empreinte bancaire) — voir note-technique-caution.md.
+// Pas de valeur "NONE" : l'absence de ligne Deposit signifie qu'aucune caution
+// n'est requise pour cette réservation.
+enum DepositStatus {
+  AUTHORIZED        // empreinte posée, fonds bloqués mais non débités
+  CAPTURE_REQUESTED // l'hôte a demandé une capture — le locataire a 48h pour contester
+  CAPTURED          // capture effectuée (totale ou partielle, voir capturedAmount)
+  CONTESTED         // contestée par le locataire — en attente de médiation manuelle
+  RELEASED          // empreinte libérée sans capture (fin de séjour sans réclamation)
+  EXPIRED           // empreinte expirée chez le prestataire avant d'avoir pu être traitée
+}
+
 enum ReviewTarget {
   LISTING // locataire note le local
   TENANT  // hôte note le locataire
@@ -215,6 +227,10 @@ model Listing {
   basePrice   Decimal     @db.Decimal(10, 2)
   cleaningFee Decimal?    @db.Decimal(10, 2)
 
+  // Caution (empreinte bancaire, jamais débitée par défaut) — voir modèle Deposit.
+  // Null/0 = aucune caution demandée pour cette annonce.
+  depositAmount Decimal? @db.Decimal(10, 2)
+
   // Override ponctuel du taux de commission.
   // Si null → on utilise PlatformConfig.serviceFeeRate au moment du calcul.
   // Permet des taux négociés par annonce ou par palier d'hôte sans migrer toutes les lignes.
@@ -328,6 +344,7 @@ model Booking {
   listing  Listing   @relation(fields: [listingId], references: [id])
   tenant   User      @relation("TenantBookings", fields: [tenantId], references: [id])
   payment  Payment?
+  deposit  Deposit?
   messages Message[]
   reviews  Review[]
 
@@ -360,6 +377,42 @@ model Payment {
   updatedAt  DateTime  @updatedAt
 
   booking Booking @relation(fields: [bookingId], references: [id])
+}
+
+// ─── CAUTION (DEPOSIT) ────────────────────────────────────────────────────────
+// Pré-autorisation bancaire distincte du paiement du séjour — voir
+// note-technique-caution.md. Une ligne n'existe que si Listing.depositAmount
+// était renseigné au moment de la réservation.
+model Deposit {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId String        @unique @db.Uuid
+  status    DepositStatus @default(AUTHORIZED)
+
+  amount Decimal @db.Decimal(10, 2) // montant de l'empreinte posée
+
+  stripePaymentIntentId String? @unique // PaymentIntent dédié, capture_method "manual"
+
+  authorizedAt DateTime? // pose de l'empreinte
+  expiresAt    DateTime? // durée de vie donnée par Stripe (~7 jours) — sert au job de renouvellement
+
+  // ── Réclamation hôte ─────────────────────────────────────────────────────
+  captureReason      String?  // motif : dégradation, no-show, retard, dépassement…
+  captureRequestedAt DateTime? // point de départ du délai de contestation (48h)
+  proofUrls          String[] @default([]) // preuves photo jointes par l'hôte
+
+  // ── Résolution ───────────────────────────────────────────────────────────
+  capturedAmount Decimal?  @db.Decimal(10, 2) // montant réellement capturé (≤ amount)
+  capturedAt     DateTime?
+  contestReason  String? // motif de contestation du locataire
+  contestedAt    DateTime?
+  releasedAt     DateTime? // libération sans capture
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@index([status])
 }
 
 // ─── MESSAGING ────────────────────────────────────────────────────────────────

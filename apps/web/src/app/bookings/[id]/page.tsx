@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { isAuthenticated, loginHref } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
 import StripePayment from '@/components/stripe-payment';
+import DepositCard from '@/components/deposit-card';
 import { useToast } from '@/components/toast';
 import { useConfirm } from '@/components/confirm';
 import { BackLink, PageLoader, StarRating, Stepper } from '@/components/ui';
@@ -37,6 +38,7 @@ export default function BookingDetailPage() {
 
   const [booking, setBooking] = useState<Booking | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
+  const [meId, setMeId] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [payLoading, setPayLoading] = useState(false);
@@ -50,10 +52,13 @@ export default function BookingDetailPage() {
       router.replace(loginHref(pathname));
       return;
     }
-    api.bookings
-      .getById(id)
-      .then((b) => {
+    Promise.all([
+      api.bookings.getById(id),
+      api.auth.me().catch(() => null),
+    ])
+      .then(([b, me]) => {
         setBooking(b);
+        setMeId(me?.id ?? null);
         return api.listings.getById(b.listingId).catch(() => null);
       })
       .then((l) => l && setListing(l))
@@ -126,7 +131,9 @@ export default function BookingDetailPage() {
   const title = listing?.title ?? booking.listing?.title ?? 'Annonce';
   const city = listing?.city ?? booking.listing?.city ?? '';
   const type = listing?.type ?? booking.listing?.type ?? 'OTHER';
-  const canPay = booking.status === 'PENDING' && !booking.payment;
+  const isHost = !!meId && meId === (listing?.hostId ?? booking.listing?.hostId);
+  const isTenant = !isHost;
+  const canPay = isTenant && booking.status === 'PENDING' && !booking.payment;
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
@@ -213,7 +220,7 @@ export default function BookingDetailPage() {
           </div>
         )}
 
-        {(booking.status === 'PENDING' || booking.status === 'CONFIRMED') && (
+        {isTenant && (booking.status === 'PENDING' || booking.status === 'CONFIRMED') && (
           <button
             onClick={handleCancel}
             disabled={cancelBusy}
@@ -223,6 +230,11 @@ export default function BookingDetailPage() {
           </button>
         )}
       </div>
+
+      {/* Caution */}
+      {(booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') && meId && (
+        <DepositCard bookingId={id} role={isHost ? 'host' : 'tenant'} />
+      )}
 
       {/* Paiement */}
       {canPay && (

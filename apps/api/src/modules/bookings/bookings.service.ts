@@ -52,6 +52,7 @@ export class BookingsService {
       serviceFee: p.serviceFee.toString(),
       taxAmount: p.taxAmount.toString(),
       totalAmount: p.totalAmount.toString(),
+      depositAmount: listing.depositAmount?.toString() ?? null,
     };
   }
 

@@ -11,6 +11,7 @@ import { PrismaService } from '@/infrastructure/database/prisma.service';
 import { StripeClient } from './stripe/stripe.client';
 import { FeaturesService } from '@/modules/features/features.service';
 import { MessagingService } from '@/modules/messaging/messaging.service';
+import { DepositsService } from '@/modules/deposits/deposits.service';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -117,6 +118,17 @@ describe('PaymentsService', () => {
         {
           provide: FeaturesService,
           useValue: { isOn: jest.fn().mockReturnValue(false), all: jest.fn(), set: jest.fn() },
+        },
+        {
+          provide: MessagingService,
+          useValue: {
+            ensureBookingConversation: jest.fn().mockResolvedValue(undefined),
+            postSystemMessage: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: DepositsService,
+          useValue: { authorizeForBooking: jest.fn().mockResolvedValue(undefined) },
         },
       ],
     }).compile();

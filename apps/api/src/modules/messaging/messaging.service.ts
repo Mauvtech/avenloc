@@ -199,6 +199,29 @@ export class MessagingService {
     };
   }
 
+  /**
+   * Message automatique posté dans le fil d'une réservation (réclamation de
+   * caution, capture, libération…) — pas d'utilisateur "acteur" direct pour les
+   * événements déclenchés par un job planifié, donc attribué à l'hôte du fil
+   * avec un préfixe qui identifie clairement un message système.
+   */
+  async postSystemMessage(bookingId: string, content: string): Promise<void> {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { bookingId },
+    });
+    if (!conversation) return;
+
+    await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        bookingId,
+        senderId: conversation.hostId,
+        senderRole: MessageSenderRole.HOST,
+        content: `🔒 Aven — ${content}`,
+      },
+    });
+  }
+
   async markAsRead(conversationId: string, userId: string): Promise<void> {
     const conversation = await this.assertParticipant(conversationId, userId);
 

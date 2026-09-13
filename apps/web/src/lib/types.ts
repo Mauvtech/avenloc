@@ -52,6 +52,7 @@ export interface Listing {
   pricingUnit: string;
   basePrice: string;
   cleaningFee: string | null;
+  depositAmount: string | null;
   cancellationPolicy: string;
   instantBookEnabled: boolean;
   amenities: string[];
@@ -181,6 +182,32 @@ export interface Quote {
   serviceFee: string;
   taxAmount: string;
   totalAmount: string;
+  depositAmount: string | null;
+}
+
+// Caution (empreinte bancaire) — voir note-technique-caution.md.
+export type DepositStatus =
+  | 'AUTHORIZED'
+  | 'CAPTURE_REQUESTED'
+  | 'CAPTURED'
+  | 'CONTESTED'
+  | 'RELEASED'
+  | 'EXPIRED';
+
+export interface Deposit {
+  id: string;
+  bookingId: string;
+  status: DepositStatus;
+  amount: string;
+  capturedAmount: string | null;
+  captureReason: string | null;
+  captureRequestedAt: string | null;
+  contestReason: string | null;
+  contestedAt: string | null;
+  capturedAt: string | null;
+  releasedAt: string | null;
+  proofUrls: string[];
+  createdAt: string;
 }
 
 export interface SearchResult {

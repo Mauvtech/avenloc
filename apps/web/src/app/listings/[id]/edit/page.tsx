@@ -25,6 +25,7 @@ export default function EditListingPage() {
     description: '',
     basePrice: '',
     cleaningFee: '',
+    depositAmount: '',
     maxGuests: '',
     cancellationPolicy: 'MODERATE',
     instantBookEnabled: false,
@@ -38,6 +39,7 @@ export default function EditListingPage() {
       description: l.description,
       basePrice: String(l.basePrice ?? ''),
       cleaningFee: l.cleaningFee != null ? String(l.cleaningFee) : '',
+      depositAmount: l.depositAmount != null ? String(l.depositAmount) : '',
       maxGuests: l.maxGuests != null ? String(l.maxGuests) : '',
       cancellationPolicy: l.cancellationPolicy,
       instantBookEnabled: l.instantBookEnabled,
@@ -68,6 +70,7 @@ export default function EditListingPage() {
         description: form.description,
         basePrice: parseFloat(form.basePrice),
         cleaningFee: form.cleaningFee ? parseFloat(form.cleaningFee) : undefined,
+        depositAmount: form.depositAmount ? parseFloat(form.depositAmount) : undefined,
         maxGuests: form.maxGuests ? parseInt(form.maxGuests, 10) : undefined,
         cancellationPolicy: form.cancellationPolicy,
         instantBookEnabled: form.instantBookEnabled,
@@ -119,7 +122,7 @@ export default function EditListingPage() {
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           />
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className="label">Prix / unité (€)</label>
             <input
@@ -141,6 +144,18 @@ export default function EditListingPage() {
               className="field"
               value={form.cleaningFee}
               onChange={(e) => setForm((f) => ({ ...f, cleaningFee: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="label">Caution (€)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className="field"
+              value={form.depositAmount}
+              onChange={(e) => setForm((f) => ({ ...f, depositAmount: e.target.value }))}
+              placeholder="Aucune"
             />
           </div>
           <div>

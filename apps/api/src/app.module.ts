@@ -13,6 +13,7 @@ import { ListingsModule } from './modules/listings/listings.module';
 import { SearchModule } from './modules/search/search.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { DepositsModule } from './modules/deposits/deposits.module';
 import { MessagingModule } from './modules/messaging/messaging.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 
@@ -34,6 +35,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     SearchModule,
     BookingsModule,
     PaymentsModule,
+    DepositsModule,
     MessagingModule,
     ReviewsModule,
   ],
