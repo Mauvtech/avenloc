@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, loginHref, registerHref } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
 import DateRangePicker from '@/components/date-range-picker';
 import PriceBreakdown from '@/components/price-breakdown';
@@ -30,11 +30,13 @@ const humanize = (k: string) => k.replace(/_/g, ' ').replace(/^\w/, (c) => c.toU
 export default function ListingPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const pathname = usePathname();
   const toast = useToast();
 
   const [listing, setListing] = useState<Listing | null>(null);
   const [reviews, setReviews] = useState<ReviewList | null>(null);
   const [me, setMe] = useState<User | null>(null);
+  const [loggedIn, setLoggedIn] = useState(false);
   const [similar, setSimilar] = useState<SearchResultItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [lightbox, setLightbox] = useState<string | null>(null);
@@ -48,6 +50,7 @@ export default function ListingPage() {
   const [statusBusy, setStatusBusy] = useState(false);
 
   useEffect(() => {
+    setLoggedIn(isAuthenticated());
     Promise.all([
       api.listings.getById(id),
       api.reviews.byListing(id),
@@ -61,6 +64,23 @@ export default function ListingPage() {
           .search(`type=${l.type}&limit=7`)
           .then((res) => setSimilar(res.listings.filter((x) => x.id !== l.id).slice(0, 3)))
           .catch(() => setSimilar([]));
+
+        // Restaure la sélection en cours si l'utilisateur revient d'une
+        // connexion/inscription déclenchée depuis cette même annonce.
+        try {
+          const raw = sessionStorage.getItem(`aven:draft:${id}`);
+          if (raw) {
+            const draft = JSON.parse(raw) as {
+              range?: typeof range;
+              bookingForm?: typeof bookingForm;
+            };
+            if (draft.range) setRange(draft.range);
+            if (draft.bookingForm) setBookingForm(draft.bookingForm);
+            sessionStorage.removeItem(`aven:draft:${id}`);
+          }
+        } catch {
+          /* ignore */
+        }
       })
       .catch(() => router.replace('/'))
       .finally(() => setLoading(false));
@@ -94,7 +114,7 @@ export default function ListingPage() {
 
   async function handleBook(e: React.FormEvent) {
     e.preventDefault();
-    if (!isAuthenticated()) return router.push('/auth/login');
+    if (!isAuthenticated()) return router.push(loginHref(pathname));
     if (!range?.startDate || !range?.endDate) {
       setBookingError('Choisissez vos dates d’arrivée et de départ.');
       return;
@@ -118,8 +138,16 @@ export default function ListingPage() {
     }
   }
 
+  function saveDraft() {
+    try {
+      sessionStorage.setItem(`aven:draft:${id}`, JSON.stringify({ range, bookingForm }));
+    } catch {
+      /* ignore */
+    }
+  }
+
   async function handleContact() {
-    if (!isAuthenticated()) return router.push('/auth/login');
+    if (!isAuthenticated()) return router.push(loginHref(pathname));
     try {
       await api.conversations.create({ listingId: id });
       router.push('/conversations');
@@ -405,7 +433,7 @@ export default function ListingPage() {
                 </div>
                 {!paymentsReady && (
                   <p className="rounded-md bg-warn-tint px-3 py-2 text-xs text-warn-fg">
-                    Vos versements ne sont pas activés — les locataires ne peuvent pas réserver.{' '}
+                    Vos encaissements ne sont pas activés — les locataires ne peuvent pas réserver.{' '}
                     <Link href="/host" className="font-semibold underline">
                       Configurer
                     </Link>
@@ -482,27 +510,58 @@ export default function ListingPage() {
                   )}
 
                   {bookingError && <p className="text-xs text-danger-fg">{bookingError}</p>}
-                  <button
-                    type="submit"
-                    disabled={bookingLoading || !paymentsReady || !range?.endDate}
-                    className="btn-primary btn-lg w-full"
-                  >
-                    {bookingLoading
-                      ? 'Réservation…'
-                      : !paymentsReady
-                        ? 'Indisponible'
-                        : quote
-                          ? `Réserver · ${eur(quote.totalAmount)}`
-                          : 'Réserver'}
-                  </button>
-                  <p className="text-center text-[11px] text-muted">
-                    Vous ne serez débité qu&apos;après confirmation.
-                  </p>
+
+                  {loggedIn ? (
+                    <>
+                      <button
+                        type="submit"
+                        disabled={bookingLoading || !paymentsReady || !range?.endDate}
+                        className="btn-primary btn-lg w-full"
+                      >
+                        {bookingLoading
+                          ? 'Réservation…'
+                          : !paymentsReady
+                            ? 'Indisponible'
+                            : quote
+                              ? `Réserver · ${eur(quote.totalAmount)}`
+                              : 'Réserver'}
+                      </button>
+                      <p className="text-center text-[11px] text-muted">
+                        Vous ne serez débité qu&apos;après confirmation.
+                      </p>
+                    </>
+                  ) : (
+                    <div className="rounded-md border border-brand/25 bg-brand-tint/40 p-3.5 text-center">
+                      <p className="text-sm font-semibold text-ink">Connectez-vous pour réserver</p>
+                      <p className="mt-1 text-xs text-muted">
+                        Créez un compte ou connectez-vous pour finaliser cette réservation et
+                        contacter l&apos;hôte. Vos dates et informations restent enregistrées ici.
+                      </p>
+                      <div className="mt-3 flex gap-2">
+                        <Link
+                          href={loginHref(pathname)}
+                          onClick={saveDraft}
+                          className="btn-primary flex-1 justify-center"
+                        >
+                          Se connecter
+                        </Link>
+                        <Link
+                          href={registerHref(pathname)}
+                          onClick={saveDraft}
+                          className="btn-ghost flex-1 justify-center"
+                        >
+                          Créer un compte
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </form>
 
-                <button onClick={handleContact} className="btn-ghost w-full">
-                  Contacter l&apos;hôte
-                </button>
+                {loggedIn && (
+                  <button onClick={handleContact} className="btn-ghost w-full">
+                    Contacter l&apos;hôte
+                  </button>
+                )}
               </>
             )}
           </div>

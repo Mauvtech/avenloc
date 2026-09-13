@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, loginHref } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
 import StripePayment from '@/components/stripe-payment';
 import { useToast } from '@/components/toast';
@@ -31,6 +31,7 @@ function stepIndex(status: string): number {
 export default function BookingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const pathname = usePathname();
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -46,7 +47,7 @@ export default function BookingDetailPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      router.replace('/auth/login');
+      router.replace(loginHref(pathname));
       return;
     }
     api.bookings

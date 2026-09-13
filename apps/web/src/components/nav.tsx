@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { clearTokens, getRefreshToken, isAuthenticated } from '@/lib/auth';
+import { clearTokens, getRefreshToken, isAuthenticated, loginHref, registerHref } from '@/lib/auth';
 import { api } from '@/lib/api';
 import Avatar from '@/components/avatar';
 import type { User } from '@/lib/types';
@@ -185,10 +185,10 @@ export default function Nav() {
             </>
           ) : (
             <>
-              <Link href="/auth/login" className="btn-ghost btn-sm">
+              <Link href={loginHref(pathname)} className="btn-ghost btn-sm">
                 Se connecter
               </Link>
-              <Link href="/auth/register" className="btn-primary btn-sm">
+              <Link href={registerHref(pathname)} className="btn-primary btn-sm">
                 S&apos;inscrire
               </Link>
             </>
@@ -285,10 +285,10 @@ export default function Nav() {
               </div>
             ) : (
               <div className="flex flex-col gap-2 p-4">
-                <Link href="/auth/register" className="btn-primary w-full">
+                <Link href={registerHref(pathname)} className="btn-primary w-full">
                   S&apos;inscrire
                 </Link>
-                <Link href="/auth/login" className="btn-ghost w-full">
+                <Link href={loginHref(pathname)} className="btn-ghost w-full">
                   Se connecter
                 </Link>
               </div>

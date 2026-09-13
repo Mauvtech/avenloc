@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, loginHref } from '@/lib/auth';
 import ListingPhotos from '@/components/listing-photos';
 import { useToast } from '@/components/toast';
 import { PageLoader } from '@/components/ui';
@@ -14,6 +14,7 @@ import type { Listing } from '@/lib/types';
 export default function EditListingPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const pathname = usePathname();
   const toast = useToast();
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,7 +47,7 @@ export default function EditListingPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      router.replace('/auth/login');
+      router.replace(loginHref(pathname));
       return;
     }
     Promise.all([api.auth.me(), api.listings.getById(id)])

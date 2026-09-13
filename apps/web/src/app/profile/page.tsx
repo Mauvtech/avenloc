@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
-import { clearTokens, getRefreshToken, isAuthenticated } from '@/lib/auth';
+import { clearTokens, getRefreshToken, isAuthenticated, loginHref } from '@/lib/auth';
 import Avatar from '@/components/avatar';
 import { PageLoader } from '@/components/ui';
 import type { User } from '@/lib/types';
@@ -17,6 +17,7 @@ const ROLE_LABEL: Record<string, string> = {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -39,15 +40,15 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      router.replace('/auth/login');
+      router.replace(loginHref(pathname));
       return;
     }
     api.auth
       .me()
       .then(hydrate)
-      .catch(() => router.replace('/auth/login'))
+      .catch(() => router.replace(loginHref(pathname)))
       .finally(() => setLoading(false));
-  }, [router]);
+  }, [router, pathname]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();

@@ -378,7 +378,7 @@ export class PaymentsService {
     const host = booking.listing.host;
     if (!host.stripeAccountId) {
       throw new BadRequestException(
-        "L'hôte n'a pas encore configuré ses informations de versement",
+        "L'hôte n'a pas encore configuré ses informations d'encaissement",
       );
     }
 

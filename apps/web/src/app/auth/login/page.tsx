@@ -1,15 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import { saveTokens } from '@/lib/auth';
+import { registerHref, safeNext, saveTokens } from '@/lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = safeNext(searchParams.get('next'));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +24,7 @@ export default function LoginPage() {
     try {
       const tokens = await api.auth.login({ email, password });
       saveTokens(tokens.accessToken, tokens.refreshToken);
-      router.push('/');
+      router.push(next ?? '/');
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de connexion');
@@ -42,10 +44,16 @@ export default function LoginPage() {
         <span className="text-lg font-bold">Aven</span>
       </div>
 
+      {next && (
+        <p className="mb-4 rounded-md bg-brand-tint px-3 py-2 text-center text-sm text-brand-fg">
+          Connectez-vous pour continuer là où vous en étiez.
+        </p>
+      )}
+
       <div className="card overflow-hidden">
         <div className="flex border-b border-line">
           <span className={`${tab} bg-surface text-ink`}>Connexion</span>
-          <Link href="/auth/register" className={`${tab} bg-canvas text-muted hover:text-ink`}>
+          <Link href={registerHref(next)} className={`${tab} bg-canvas text-muted hover:text-ink`}>
             Inscription
           </Link>
         </div>
@@ -89,10 +97,18 @@ export default function LoginPage() {
 
       <p className="mt-5 text-center text-sm text-muted">
         Pas encore de compte ?{' '}
-        <Link href="/auth/register" className="font-semibold">
+        <Link href={registerHref(next)} className="font-semibold">
           S&apos;inscrire
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="py-16 text-center text-muted">Chargement…</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

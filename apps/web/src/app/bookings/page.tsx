@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, loginHref } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
 import { EmptyState, PageHeader, Skeleton } from '@/components/ui';
 import { dateShort, eur } from '@/lib/format';
@@ -19,15 +19,16 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 
 export default function BookingsPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const [bookings, setBookings] = useState<Booking[] | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      router.replace('/auth/login');
+      router.replace(loginHref(pathname));
       return;
     }
     api.bookings.mine().then(setBookings).catch(() => setBookings([]));
-  }, [router]);
+  }, [router, pathname]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

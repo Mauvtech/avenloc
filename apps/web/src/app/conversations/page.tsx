@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, loginHref } from '@/lib/auth';
 import Avatar from '@/components/avatar';
 import { EmptyState, PageHeader, PageLoader } from '@/components/ui';
 import type { Conversation, Message } from '@/lib/types';
@@ -17,6 +17,7 @@ const msgTime = (iso: string) =>
 
 export default function ConversationsPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [active, setActive] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -28,7 +29,7 @@ export default function ConversationsPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      router.replace('/auth/login');
+      router.replace(loginHref(pathname));
       return;
     }
     Promise.all([api.auth.me().catch(() => null), api.conversations.list().catch(() => [])])

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, loginHref } from '@/lib/auth';
 import AvailabilityCalendar from '@/components/availability-calendar';
 import { PageLoader } from '@/components/ui';
 import { typeLabel } from '@/lib/listing';
@@ -13,12 +13,13 @@ import type { Listing } from '@/lib/types';
 export default function ListingCalendarPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const pathname = usePathname();
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      router.replace('/auth/login');
+      router.replace(loginHref(pathname));
       return;
     }
     Promise.all([api.auth.me(), api.listings.getById(id)])

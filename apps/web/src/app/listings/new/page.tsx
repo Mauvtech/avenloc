@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, loginHref } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
 import AddressAutocomplete from '@/components/address-autocomplete';
 import { BackLink, Stepper } from '@/components/ui';
@@ -24,6 +24,7 @@ const STEPS = ['Type & description', 'Localisation', 'Prix & détails', 'Photos'
 
 export default function NewListingPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const toast = useToast();
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -57,8 +58,8 @@ export default function NewListingPage() {
   useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
 
   useEffect(() => {
-    if (!isAuthenticated()) router.replace('/auth/login');
-  }, [router]);
+    if (!isAuthenticated()) router.replace(loginHref(pathname));
+  }, [router, pathname]);
 
   function onAddressSelect(r: GeoResult) {
     setGeo(r);

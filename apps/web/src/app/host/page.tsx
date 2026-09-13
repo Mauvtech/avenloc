@@ -2,9 +2,9 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { api, type ConnectStatus } from '@/lib/api';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, loginHref } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
 import { EmptyState, PageHeader, PageLoader } from '@/components/ui';
 import { useConfirm } from '@/components/confirm';
@@ -40,6 +40,7 @@ export default function HostDashboardPage() {
 
 function HostDashboard() {
   const router = useRouter();
+  const pathname = usePathname();
   const confirm = useConfirm();
   const toast = useToast();
   const searchParams = useSearchParams();
@@ -68,7 +69,7 @@ function HostDashboard() {
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      router.replace('/auth/login');
+      router.replace(loginHref(pathname));
       return;
     }
     api.auth
@@ -80,9 +81,9 @@ function HostDashboard() {
         }
         return load();
       })
-      .catch(() => router.replace('/auth/login'))
+      .catch(() => router.replace(loginHref(pathname)))
       .finally(() => setLoading(false));
-  }, [router, load]);
+  }, [router, load, pathname]);
 
   // Après création d'une annonce : met en avant la ligne concernée.
   useEffect(() => {
@@ -196,11 +197,11 @@ function HostDashboard() {
         }
       />
 
-      {/* Versements Stripe */}
+      {/* Encaissements Stripe */}
       {connectChecked &&
         (active ? (
           <div className="rounded-lg border border-success/30 bg-success-tint p-3 text-sm text-success-fg">
-            <span className="font-semibold">✓ Versements activés</span>
+            <span className="font-semibold">✓ Encaissements activés</span>
             {connect?.last4 && (
               <span>
                 {' '}— IBAN •••• <span className="font-mono font-semibold">{connect.last4}</span>
@@ -213,7 +214,7 @@ function HostDashboard() {
           </div>
         ) : (
           <div className="card space-y-3 p-4">
-            <div className="text-sm font-bold">Configurez vos versements</div>
+            <div className="text-sm font-bold">Configurez vos encaissements</div>
             <p className="text-sm text-muted">
               {connectPending
                 ? 'Stripe vérifie encore vos informations.'
@@ -224,7 +225,7 @@ function HostDashboard() {
                 ? 'Redirection…'
                 : connectPending
                   ? 'Reprendre la configuration'
-                  : 'Configurer mes versements'}
+                  : 'Configurer mes encaissements'}
             </button>
           </div>
         ))}

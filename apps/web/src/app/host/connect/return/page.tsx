@@ -2,17 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, loginHref } from '@/lib/auth';
 
 export default function ConnectReturnPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const [state, setState] = useState<'checking' | 'active' | 'incomplete' | 'error'>('checking');
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      router.replace('/auth/login');
+      router.replace(loginHref(pathname));
       return;
     }
     api.payments
@@ -28,7 +29,7 @@ export default function ConnectReturnPage() {
       {state === 'active' && (
         <>
           <div className="text-2xl">✅</div>
-          <h1 className="text-xl font-extrabold">Versements activés</h1>
+          <h1 className="text-xl font-extrabold">Encaissements activés</h1>
           <p className="text-sm text-muted">
             Vos coordonnées ont été enregistrées par Stripe. Vos annonces peuvent recevoir des
             réservations payées.

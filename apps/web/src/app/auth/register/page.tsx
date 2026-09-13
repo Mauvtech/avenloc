@@ -4,7 +4,7 @@ import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import { saveTokens } from '@/lib/auth';
+import { loginHref, safeNext, saveTokens } from '@/lib/auth';
 
 type Role = 'TENANT' | 'HOST';
 
@@ -16,6 +16,7 @@ const ROLE_OPTIONS: { value: Role; title: string; desc: string }[] = [
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const next = safeNext(searchParams.get('next'));
   const [role, setRole] = useState<Role>(searchParams.get('role') === 'host' ? 'HOST' : 'TENANT');
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '' });
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +33,7 @@ function RegisterForm() {
     try {
       const tokens = await api.auth.register({ ...form, role });
       saveTokens(tokens.accessToken, tokens.refreshToken);
-      router.push(role === 'HOST' ? '/host' : '/');
+      router.push(next ?? (role === 'HOST' ? '/host' : '/'));
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'inscription");
@@ -52,9 +53,15 @@ function RegisterForm() {
         <span className="text-lg font-bold">Aven</span>
       </div>
 
+      {next && (
+        <p className="mb-4 rounded-md bg-brand-tint px-3 py-2 text-center text-sm text-brand-fg">
+          Créez votre compte pour continuer là où vous en étiez.
+        </p>
+      )}
+
       <div className="card overflow-hidden">
         <div className="flex border-b border-line">
-          <Link href="/auth/login" className={`${tab} bg-canvas text-muted hover:text-ink`}>
+          <Link href={loginHref(next)} className={`${tab} bg-canvas text-muted hover:text-ink`}>
             Connexion
           </Link>
           <span className={`${tab} bg-surface text-ink`}>Inscription</span>
@@ -130,7 +137,7 @@ function RegisterForm() {
 
       <p className="mt-5 text-center text-sm text-muted">
         Déjà un compte ?{' '}
-        <Link href="/auth/login" className="font-semibold">
+        <Link href={loginHref(next)} className="font-semibold">
           Se connecter
         </Link>
       </p>

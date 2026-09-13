@@ -2,18 +2,19 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, loginHref } from '@/lib/auth';
 
 // Stripe renvoie ici si le lien d'onboarding a expiré : on en régénère un.
 export default function ConnectRefreshPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      router.replace('/auth/login');
+      router.replace(loginHref(pathname));
       return;
     }
     api.payments
