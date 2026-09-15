@@ -16,6 +16,8 @@ export default function AvailabilityCalendar({ listingId }: Props) {
   const [loading, setLoading] = useState(true);
   const [busyDay, setBusyDay] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Premier jour cliqué d'une plage à bloquer en une fois (ex. "23 déc → 2 jan").
+  const [rangeStart, setRangeStart] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const rows = await api.listings.availability(listingId).catch(() => []);
@@ -31,16 +33,13 @@ export default function AvailabilityCalendar({ listingId }: Props) {
     load().finally(() => setLoading(false));
   }, [load]);
 
-  async function toggle(iso: string) {
-    setBusyDay(iso);
+  async function blockRange(startIso: string, endIsoInclusive: string) {
+    setBusyDay(startIso);
     setError(null);
     try {
-      const existingId = blocked.get(iso);
-      if (existingId) {
-        await api.listings.unblock(listingId, existingId);
-      } else {
-        await api.listings.blockDates(listingId, iso, toISO(addDays(fromISO(iso), 1)));
-      }
+      const [from, to] =
+        startIso <= endIsoInclusive ? [startIso, endIsoInclusive] : [endIsoInclusive, startIso];
+      await api.listings.blockDates(listingId, from, toISO(addDays(fromISO(to), 1)));
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Action impossible');
@@ -49,22 +48,65 @@ export default function AvailabilityCalendar({ listingId }: Props) {
     }
   }
 
+  async function toggle(iso: string) {
+    // Un jour déjà bloqué se débloque toujours au premier clic, sans mode plage.
+    const existingId = blocked.get(iso);
+    if (existingId) {
+      setRangeStart(null);
+      setBusyDay(iso);
+      setError(null);
+      try {
+        await api.listings.unblock(listingId, existingId);
+        await load();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Action impossible');
+      } finally {
+        setBusyDay(null);
+      }
+      return;
+    }
+
+    if (!rangeStart) {
+      setRangeStart(iso);
+      return;
+    }
+    if (rangeStart === iso) {
+      // Deuxième clic sur le même jour : bloque ce seul jour.
+      setRangeStart(null);
+      await blockRange(iso, iso);
+      return;
+    }
+    const start = rangeStart;
+    setRangeStart(null);
+    await blockRange(start, iso);
+  }
+
   if (loading) return <PageLoader label="Chargement du calendrier…" />;
 
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted">
-        Cliquez un jour pour le <strong>bloquer</strong> ou le <strong>débloquer</strong>. Les jours
-        bloqués n&apos;apparaissent plus comme réservables pour les locataires.
+        Cliquez un jour pour le <strong>bloquer</strong>, ou deux jours pour bloquer toute la{' '}
+        <strong>plage</strong> entre les deux. Cliquez un jour bloqué pour le{' '}
+        <strong>débloquer</strong>. Les jours bloqués n&apos;apparaissent plus comme réservables
+        pour les locataires.
       </p>
+      {rangeStart && (
+        <p className="text-xs text-brand-fg">
+          Début de plage sélectionné ({rangeStart}) — cliquez le dernier jour à bloquer.{' '}
+          <button type="button" onClick={() => setRangeStart(null)} className="underline">
+            Annuler
+          </button>
+        </p>
+      )}
 
       <MonthCalendar
         months={2}
         onDayClick={toggle}
         dayClassName={(iso) =>
           `${blocked.has(iso) ? 'bg-danger-tint font-semibold text-danger-fg line-through' : ''} ${
-            busyDay === iso ? 'opacity-40' : ''
-          }`
+            rangeStart === iso ? 'ring-2 ring-brand' : ''
+          } ${busyDay === iso ? 'opacity-40' : ''}`
         }
       />
 

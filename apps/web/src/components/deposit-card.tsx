@@ -100,6 +100,12 @@ export default function DepositCard({ bookingId, role }: Props) {
           <p className="font-semibold">
             Réclamation de {eur(deposit.capturedAmount ?? deposit.amount)} — {deposit.captureReason}
           </p>
+          {role === 'tenant' && (
+            <p className="text-xs">
+              Vous avez 48h pour contester avec preuves. Sans réponse de votre part, le montant sera
+              automatiquement capturé.
+            </p>
+          )}
           {deposit.proofUrls.length > 0 && (
             <div className="flex gap-2">
               {deposit.proofUrls.map((u) => (
@@ -162,6 +168,10 @@ export default function DepositCard({ bookingId, role }: Props) {
             </button>
           ) : (
             <form onSubmit={submitClaim} className="space-y-2 rounded-md border border-line p-3">
+              <p className="text-xs text-muted">
+                Le client sera notifié et disposera de 48h pour contester avant toute capture. Une
+                preuve photo est obligatoire.
+              </p>
               <div>
                 <label className="label">Motif</label>
                 <select

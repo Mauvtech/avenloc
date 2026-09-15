@@ -5,6 +5,7 @@ import type {
   SearchEnginePort,
   SearchFilters,
   SearchResult,
+  SearchFacets,
   ListingSearchItem,
 } from '../ports/search-engine.port';
 
@@ -23,6 +24,7 @@ interface RawListingRow {
   cover_photo_url: string | null;
   avg_rating: number | null;
   review_count: number;
+  host_verified: boolean;
   total_count: number;
 }
 
@@ -80,6 +82,18 @@ export class PostgisSearchAdapter implements SearchEnginePort {
         ? Prisma.sql`AND l.amenities @> ${filters.amenities}::text[]`
         : Prisma.empty;
 
+    const qClause = filters.q?.trim()
+      ? Prisma.sql`AND (
+          l.title ILIKE ${'%' + filters.q.trim() + '%'}
+          OR l.city ILIKE ${'%' + filters.q.trim() + '%'}
+          OR l."addressLine1" ILIKE ${'%' + filters.q.trim() + '%'}
+        )`
+      : Prisma.empty;
+
+    const instantBookClause = filters.instantBook
+      ? Prisma.sql`AND l."instantBookEnabled" = true`
+      : Prisma.empty;
+
     // Exclut les annonces déjà réservées OU dont l'hôte a bloqué la plage demandée
     const dateClause =
       filters.startDate && filters.endDate
@@ -134,9 +148,11 @@ export class PostgisSearchAdapter implements SearchEnginePort {
         ) AS cover_photo_url,
         AVG(r.rating)::float AS avg_rating,
         COUNT(r.id)::int     AS review_count,
+        bool_or(u."identityStatus" = 'VERIFIED') AS host_verified,
         COUNT(*) OVER ()::int AS total_count
       FROM "Listing" l
       LEFT JOIN "Review" r ON r."listingId" = l.id AND r.target = 'LISTING'
+      LEFT JOIN "User" u ON u.id = l."hostId"
       WHERE l.status = 'PUBLISHED'
         ${geoClause}
         ${typeClause}
@@ -144,6 +160,8 @@ export class PostgisSearchAdapter implements SearchEnginePort {
         ${maxPriceClause}
         ${maxGuestsClause}
         ${amenitiesClause}
+        ${qClause}
+        ${instantBookClause}
         ${dateClause}
       GROUP BY l.id
       ${orderClause}
@@ -167,8 +185,28 @@ export class PostgisSearchAdapter implements SearchEnginePort {
       coverPhotoUrl: row.cover_photo_url,
       rating: row.avg_rating !== null ? Math.round(Number(row.avg_rating) * 10) / 10 : null,
       reviewCount: Number(row.review_count),
+      hostVerified: row.host_verified,
     }));
 
     return { listings, total, page: filters.page, limit: filters.limit };
+  }
+
+  async facets(): Promise<SearchFacets> {
+    const rows = await this.prisma.$queryRaw<
+      { types: string[]; amenities: string[]; max_price: number | null }[]
+    >`
+      SELECT
+        ARRAY(SELECT DISTINCT type::text FROM "Listing" WHERE status = 'PUBLISHED') AS types,
+        ARRAY(
+          SELECT DISTINCT a FROM "Listing" l2, unnest(l2.amenities) AS a WHERE l2.status = 'PUBLISHED'
+        ) AS amenities,
+        (SELECT MAX("basePrice") FROM "Listing" WHERE status = 'PUBLISHED') AS max_price
+    `;
+    const row = rows[0];
+    return {
+      types: row?.types ?? [],
+      amenities: row?.amenities ?? [],
+      maxPrice: Math.max(10, Number(row?.max_price ?? 0), 100),
+    };
   }
 }

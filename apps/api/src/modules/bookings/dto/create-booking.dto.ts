@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsBoolean,
   Min,
   MaxLength,
 } from 'class-validator';
@@ -31,4 +32,21 @@ export class CreateBookingDto {
   @IsString()
   @MaxLength(50)
   arrivalTime?: string;
+
+  // Activité/usage prévu de l'espace — obligatoire côté service si
+  // Listing.instantBookEnabled = false (voir BookingsService.create).
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  activityDescription?: string;
+
+  // Confirmation d'assurance RC Pro — obligatoire côté service si Listing.rcProRequired.
+  @IsOptional()
+  @IsBoolean()
+  rcProConfirmed?: boolean;
+
+  // Acceptation du règlement intérieur — obligatoire côté service si Listing.houseRules renseigné.
+  @IsOptional()
+  @IsBoolean()
+  houseRulesAccepted?: boolean;
 }

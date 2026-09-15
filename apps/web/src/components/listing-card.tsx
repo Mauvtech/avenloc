@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import CategoryIcon from '@/components/category-icon';
 import WishlistButton from '@/components/wishlist-button';
+import { VerifiedBadge } from '@/components/ui';
 import { eurRound } from '@/lib/format';
 import { typeLabel, UNIT_LABEL_SHORT } from '@/lib/listing';
 import type { SearchResultItem } from '@/lib/types';
@@ -44,12 +45,16 @@ export default function ListingCard({ listing }: { listing: SearchResultItem }) 
         </div>
         <p className="text-xs text-muted">
           {listing.city}
+          {listing.maxGuests ? ` · ${listing.maxGuests} pers.` : ''}
           {listing.distanceKm > 0 && ` · ${listing.distanceKm.toFixed(1)} km`}
         </p>
-        <p className="pt-1 text-[15px]">
-          <span className="font-extrabold">{eurRound(listing.basePrice)}</span>
-          <span className="text-sm text-muted"> / {unit}</span>
-        </p>
+        <div className="flex items-center justify-between pt-1">
+          <p className="text-[15px]">
+            <span className="font-extrabold">{eurRound(listing.basePrice)}</span>
+            <span className="text-sm text-muted"> / {unit}</span>
+          </p>
+          {listing.hostVerified && <VerifiedBadge />}
+        </div>
       </div>
     </Link>
   );

@@ -24,6 +24,7 @@ function toItem(l: Listing): SearchResultItem {
     coverPhotoUrl: l.photos?.[0]?.url ?? null,
     rating: null,
     reviewCount: 0,
+    hostVerified: l.host?.verified ?? false,
   };
 }
 

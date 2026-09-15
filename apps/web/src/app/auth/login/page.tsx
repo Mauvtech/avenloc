@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { registerHref, safeNext, saveTokens } from '@/lib/auth';
+import { Logo } from '@/components/nav';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 
@@ -37,11 +38,8 @@ function LoginForm() {
 
   return (
     <div className="mx-auto max-w-sm py-6">
-      <div className="mb-7 flex items-center justify-center gap-2.5">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-[15px] font-extrabold text-white">
-          A
-        </span>
-        <span className="text-lg font-bold">Aven</span>
+      <div className="mb-7 flex items-center justify-center">
+        <Logo />
       </div>
 
       {next && (
@@ -59,6 +57,14 @@ function LoginForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3.5 p-6">
+          <a href={`${API_URL}/auth/google`} className="btn-ghost w-full">
+            Continuer avec Google
+          </a>
+          <div className="flex items-center gap-3 text-xs text-muted">
+            <span className="h-px flex-1 bg-line" />
+            ou
+            <span className="h-px flex-1 bg-line" />
+          </div>
           <div>
             <label className="label">Email</label>
             <input
@@ -88,10 +94,6 @@ function LoginForm() {
           <button type="submit" disabled={loading} className="btn-primary w-full">
             {loading ? 'Chargement…' : 'Se connecter'}
           </button>
-
-          <a href={`${API_URL}/auth/google`} className="btn-ghost w-full">
-            Continuer avec Google
-          </a>
         </form>
       </div>
 

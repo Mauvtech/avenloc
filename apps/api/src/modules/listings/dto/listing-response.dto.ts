@@ -3,6 +3,7 @@ import type {
   ListingStatus,
   PricingUnit,
   CancellationPolicy,
+  AccessMethod,
   ListingPhoto,
   ListingAvailability,
 } from '@prisma/client';
@@ -29,6 +30,15 @@ export class ListingResponseDto {
   serviceFeeRateOverride: string | null;
   cancellationPolicy: CancellationPolicy;
   instantBookEnabled: boolean;
+  createdByCommercial: boolean;
+  accessMethod: AccessMethod;
+  accessCode: string | null;
+  wifiName: string | null;
+  wifiPassword: string | null;
+  contactPhone: string | null;
+  rcProRequired: boolean;
+  houseRules: string | null;
+  faq: unknown;
   amenities: string[];
   specificAttributes: unknown;
   createdAt: Date;
@@ -44,5 +54,7 @@ export class ListingResponseDto {
     avatarUrl: string | null;
     bio: string | null;
     createdAt: Date | null;
+    /** Identité vérifiée — voir VerifiedBadge dans le design de référence. */
+    verified: boolean;
   } | null;
 }

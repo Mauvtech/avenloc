@@ -44,61 +44,59 @@ export default function CategoryIcon({ type, size = 18, className }: Props) {
           <polygon points="12,3 15.5,9 8.5,9" {...s} />
         </svg>
       );
-    case 'WAREHOUSE':
-      return (
-        <svg {...common}>
-          <rect x="3" y="10" width="18" height="9" {...s} />
-          <polygon points="12,4 21,10 3,10" {...s} />
-          <rect x="9.5" y="13" width="5" height="6" stroke="currentColor" strokeWidth={1.4} />
-        </svg>
-      );
     case 'EVENT_SPACE':
       return (
         <svg {...common}>
           <polygon points="12,3 20,12 12,21 4,12" {...s} />
         </svg>
       );
-    case 'PARKING':
+    case 'TRAINING_ROOM':
       return (
         <svg {...common}>
-          <rect x="3.5" y="3.5" width="17" height="17" rx="1" {...s} />
-          <text
-            x="12"
-            y="16.5"
-            textAnchor="middle"
-            fontSize="11"
-            fontWeight="700"
-            fill="currentColor"
-            fontFamily="Arial, sans-serif"
-          >
-            P
-          </text>
+          <rect x="4" y="4" width="16" height="10" rx="1" {...s} />
+          <line x1="8" y1="14" x2="8" y2="19" {...s} />
+          <line x1="16" y1="14" x2="16" y2="19" {...s} />
+          <line x1="4" y1="19" x2="20" y2="19" {...s} />
         </svg>
       );
-    case 'HOUSE':
+    case 'BOUTIQUE':
       return (
         <svg {...common}>
-          <polygon points="12,3 21,10 3,10" {...s} />
-          <rect x="5" y="10" width="14" height="10" {...s} />
-          <rect x="10" y="14" width="4" height="6" stroke="currentColor" strokeWidth={1.4} />
+          <path d="M4 9l1-5h14l1 5" {...s} />
+          <path d="M4 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" {...s} />
+          <rect x="5" y="9" width="14" height="10" {...s} />
         </svg>
       );
-    case 'ROOM':
+    case 'CABINET':
       return (
         <svg {...common}>
-          <rect x="4" y="7" width="16" height="12" rx="1" {...s} />
-          <path d="M4 12h10v7" {...s} />
+          <rect x="4" y="5" width="16" height="14" rx="1" {...s} />
+          <line x1="4" y1="11" x2="20" y2="11" {...s} />
+          <path d="M9 15a3 3 0 0 1 6 0" {...s} />
         </svg>
       );
-    case 'APARTMENT':
+    case 'RESTAURANT':
       return (
         <svg {...common}>
-          <rect x="5" y="3" width="14" height="18" rx="1" {...s} />
-          <line x1="9" y1="7" x2="9" y2="7.5" {...s} />
-          <line x1="15" y1="7" x2="15" y2="7.5" {...s} />
-          <line x1="9" y1="11" x2="9" y2="11.5" {...s} />
-          <line x1="15" y1="11" x2="15" y2="11.5" {...s} />
-          <line x1="10.5" y1="21" x2="13.5" y2="21" {...s} />
+          <line x1="7" y1="3" x2="7" y2="12" {...s} />
+          <line x1="5" y1="3" x2="5" y2="8" {...s} />
+          <line x1="9" y1="3" x2="9" y2="8" {...s} />
+          <line x1="7" y1="12" x2="7" y2="21" {...s} />
+          <path d="M17 3c-1.5 0-2.5 1.5-2.5 4s1 4 2.5 4v10" {...s} />
+        </svg>
+      );
+    case 'DESK':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="8" r="4" {...s} />
+          <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" {...s} />
+        </svg>
+      );
+    case 'CREATIVE_STUDIO':
+      return (
+        <svg {...common}>
+          <path d="M4 20l1.5-4L16 5.5a1.5 1.5 0 0 1 2 0l.5.5a1.5 1.5 0 0 1 0 2L8 18.5 4 20z" {...s} />
+          <line x1="14.5" y1="7" x2="17" y2="9.5" {...s} />
         </svg>
       );
     default:

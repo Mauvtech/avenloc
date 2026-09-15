@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
-import type { Listing } from '@prisma/client';
+import type { Listing, CancellationPolicy } from '@prisma/client';
 import { PrismaService } from '@/infrastructure/database/prisma.service';
 import { RedisService } from '@/infrastructure/cache/redis.service';
 
@@ -62,6 +62,25 @@ export class PricingService {
   async getHostApprovalWindowHours(): Promise<number> {
     const config = await this.getPlatformConfig();
     return config.hostApprovalWindowHours;
+  }
+
+  /**
+   * Taux de remboursement (0 à 1) selon la politique d'annulation et le délai
+   * restant avant le début du séjour — voir CANCELLATION_DETAIL côté front et
+   * CANCELLATION_POLICIES dans le design de référence, seule source faisant foi
+   * (le commentaire de l'enum Prisma est obsolète et ne doit pas être suivi).
+   */
+  refundRate(policy: CancellationPolicy, hoursUntilStart: number): number {
+    switch (policy) {
+      case 'FLEXIBLE':
+        return hoursUntilStart >= 24 ? 1 : 0;
+      case 'MODERATE':
+        return hoursUntilStart >= 72 ? 1 : hoursUntilStart >= 24 ? 0.5 : 0;
+      case 'STRICT':
+        return hoursUntilStart >= 168 ? 0.5 : 0;
+      case 'NON_REFUNDABLE':
+        return 0;
+    }
   }
 
   private async getPlatformConfig(): Promise<CachedPlatformConfig> {

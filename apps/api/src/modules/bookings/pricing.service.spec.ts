@@ -12,7 +12,7 @@ function makeDecimal(n: string | number): Decimal {
 const baseListing: Listing = {
   id: 'listing-1',
   hostId: 'host-1',
-  type: 'APARTMENT',
+  type: 'MEETING_ROOM',
   status: 'PUBLISHED',
   title: 'Test Apartment',
   description: 'desc',
@@ -31,6 +31,15 @@ const baseListing: Listing = {
   serviceFeeRateOverride: null,
   cancellationPolicy: 'MODERATE',
   instantBookEnabled: false,
+  createdByCommercial: false,
+  accessMethod: 'CODE',
+  accessCode: null,
+  wifiName: null,
+  wifiPassword: null,
+  contactPhone: null,
+  rcProRequired: false,
+  houseRules: null,
+  faq: null,
   amenities: [],
   specificAttributes: null,
   createdAt: new Date(),
@@ -143,6 +152,33 @@ describe('PricingService', () => {
       expect(result.effectiveServiceFeeRate.toFixed(2)).toBe('0.05');
       expect(result.serviceFee.toFixed(2)).toBe('5.00');
       expect(result.totalAmount.toFixed(2)).toBe('126.00');
+    });
+  });
+
+  describe('refundRate', () => {
+    it('FLEXIBLE: 100% at ≥24h, 0% under', () => {
+      expect(service.refundRate('FLEXIBLE', 48)).toBe(1);
+      expect(service.refundRate('FLEXIBLE', 24)).toBe(1);
+      expect(service.refundRate('FLEXIBLE', 23.9)).toBe(0);
+    });
+
+    it('MODERATE: 100% at ≥3 days, 50% at ≥24h, 0% under', () => {
+      expect(service.refundRate('MODERATE', 24 * 4)).toBe(1);
+      expect(service.refundRate('MODERATE', 72)).toBe(1);
+      expect(service.refundRate('MODERATE', 48)).toBe(0.5);
+      expect(service.refundRate('MODERATE', 24)).toBe(0.5);
+      expect(service.refundRate('MODERATE', 10)).toBe(0);
+    });
+
+    it('STRICT: 50% at ≥7 days, 0% under', () => {
+      expect(service.refundRate('STRICT', 24 * 10)).toBe(0.5);
+      expect(service.refundRate('STRICT', 168)).toBe(0.5);
+      expect(service.refundRate('STRICT', 100)).toBe(0);
+    });
+
+    it('NON_REFUNDABLE: always 0%', () => {
+      expect(service.refundRate('NON_REFUNDABLE', 24 * 30)).toBe(0);
+      expect(service.refundRate('NON_REFUNDABLE', 0)).toBe(0);
     });
   });
 });

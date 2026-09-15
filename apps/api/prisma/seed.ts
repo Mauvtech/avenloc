@@ -68,30 +68,30 @@ async function main() {
     create: {
       id: '72d60f9a-8528-49e5-a911-7a2a546c3906',
       hostId: host.id,
-      type: 'APARTMENT',
+      type: 'CREATIVE_STUDIO',
       status: 'PUBLISHED',
-      title: 'Bel appartement dans le Marais',
+      title: 'Studio créatif lumineux dans le Marais',
       description:
-        'Appartement lumineux de 45m² au cœur du Marais. Parquet, hauteur sous plafond 3m, cuisine équipée. Idéal pour découvrir Paris à pied.',
+        'Studio baigné de lumière naturelle de 45m² au cœur du Marais. Parquet, hauteur sous plafond 3m, coin kitchenette. Idéal pour shootings, ateliers créatifs et petits tournages.',
       addressLine1: '12 Rue des Rosiers',
       city: 'Paris',
       postalCode: '75004',
       country: 'FR',
       latitude: 48.8566,
       longitude: 2.3522,
-      maxGuests: 2,
-      pricingUnit: 'NIGHT',
+      maxGuests: 8,
+      pricingUnit: 'DAY',
       basePrice: 120,
       cleaningFee: 25,
       cancellationPolicy: 'MODERATE',
       instantBookEnabled: true,
-      amenities: ['wifi', 'kitchen', 'washer', 'heating'],
-      specificAttributes: { floor: 3, elevator: true, balcony: false },
+      amenities: ['wifi', 'heating', 'kitchen'],
+      specificAttributes: { naturalLight: true, floor: 3, elevator: true },
     },
   });
 
-  // Seed listing (Paris — bureau)
-  await prisma.listing.upsert({
+  // Seed listing (Paris — bureau, facturation à l'heure)
+  const meetingRoom = await prisma.listing.upsert({
     where: { id: 'fabcc917-94cb-46fa-9d62-00d80f9a6035' },
     update: {},
     create: {
@@ -112,13 +112,39 @@ async function main() {
       basePrice: 45,
       cancellationPolicy: 'FLEXIBLE',
       instantBookEnabled: false,
+      rcProRequired: true,
+      houseRules:
+        'Non-fumeur. Interdiction de déplacer le mobilier fixe. Nettoyage sommaire demandé après usage.',
+      faq: [
+        { question: 'Y a-t-il un vidéoprojecteur ?', reponse: 'Oui, avec câble HDMI et adaptateur USB-C fournis.' },
+        { question: 'Le café est-il inclus ?', reponse: 'Oui, une machine à café en libre-service est à disposition.' },
+      ],
       amenities: ['wifi', 'projector', 'whiteboard', 'ac', 'coffee'],
       specificAttributes: { projector: true, whiteboard: true, capacity_persons: 12 },
     },
   });
-  await ensurePhotos(listing.id, 'APARTMENT', 0);
-  await ensurePhotos('fabcc917-94cb-46fa-9d62-00d80f9a6035', 'MEETING_ROOM', 1);
-  console.log('✓ Listings + photos seeded');
+
+  // Créneaux horaires : lun-ven 8h-19h, tranches d'1h.
+  for (let dayOfWeek = 1; dayOfWeek <= 5; dayOfWeek++) {
+    const existing = await prisma.listingAvailabilityRule.findFirst({
+      where: { listingId: meetingRoom.id, dayOfWeek },
+    });
+    if (existing) continue;
+    await prisma.listingAvailabilityRule.create({
+      data: {
+        listingId: meetingRoom.id,
+        dayOfWeek,
+        startTime: '08:00',
+        endTime: '19:00',
+        minDurationMinutes: 60,
+        minLeadTimeMinutes: 60,
+      },
+    });
+  }
+
+  await ensurePhotos(listing.id, 'CREATIVE_STUDIO', 0);
+  await ensurePhotos(meetingRoom.id, 'MEETING_ROOM', 1);
+  console.log('✓ Listings + photos + créneaux horaires seedés');
 
   console.log('\n✅ Seed terminé !');
   console.log('\nComptes de test :');

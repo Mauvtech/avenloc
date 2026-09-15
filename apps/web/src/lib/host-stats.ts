@@ -14,6 +14,7 @@ export const fmtEUR2 = eur;
 export interface HostStats {
   revenueNet: number;
   revenueMonth: number;
+  bookingsMonth: number;
   upcomingRevenue: number;
   avgBasket: number;
   platformFees: number;
@@ -39,6 +40,7 @@ export function computeHostStats(bookings: Booking[]): HostStats {
 
   let revenueNet = 0;
   let revenueMonth = 0;
+  let bookingsMonth = 0;
   let upcomingRevenue = 0;
   let platformFees = 0;
   let nightsUpcoming = 0;
@@ -70,7 +72,10 @@ export function computeHostStats(bookings: Booking[]): HostStats {
       revenueNet += net;
       platformFees += num(b.serviceFee);
       earnedCount++;
-      if (start >= monthStart && start < monthEnd) revenueMonth += net;
+      if (start >= monthStart && start < monthEnd) {
+        revenueMonth += net;
+        bookingsMonth++;
+      }
       if (b.status === 'CONFIRMED' && start >= today) {
         upcomingRevenue += net;
         nightsUpcoming += nights;
@@ -83,6 +88,7 @@ export function computeHostStats(bookings: Booking[]): HostStats {
   return {
     revenueNet,
     revenueMonth,
+    bookingsMonth,
     upcomingRevenue,
     avgBasket: earnedCount ? revenueNet / earnedCount : 0,
     platformFees,

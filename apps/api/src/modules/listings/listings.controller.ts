@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -19,6 +20,11 @@ import { ListingsService } from './listings.service';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { CreateAvailabilityDto, UpdateListingStatusDto } from './dto/availability.dto';
+import { CreateAvailabilityRuleDto, ManagedSlotDto, SlotDto } from './dto/availability-rule.dto';
+import {
+  CreateCommercialListingDto,
+  CreateCommercialListingResponseDto,
+} from './dto/create-commercial-listing.dto';
 import { ReorderPhotosDto } from './dto/reorder-photos.dto';
 import type { ListingResponseDto } from './dto/listing-response.dto';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
@@ -26,7 +32,7 @@ import { RolesGuard } from '@/common/guards/roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import type { ListingAvailability, ListingPhoto } from '@prisma/client';
+import type { ListingAvailability, ListingAvailabilityRule, ListingPhoto } from '@prisma/client';
 import type { Express } from 'express';
 
 @Controller('listings')
@@ -42,6 +48,19 @@ export class ListingsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ListingResponseDto> {
     return this.listingsService.create(dto, user);
+  }
+
+  // Création pour le compte d'un hôte par un commercial (ou par l'hôte lui-même,
+  // le wizard front réutilise cette route dans les deux contextes). Aucun rôle
+  // dédié requis — voir ListingsService.createForHost.
+  @Post('commercial')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  createForHost(
+    @Body() dto: CreateCommercialListingDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<CreateCommercialListingResponseDto> {
+    return this.listingsService.createForHost(dto, user);
   }
 
   @Get('me')
@@ -154,5 +173,51 @@ export class ListingsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<void> {
     return this.listingsService.deleteAvailability(id, availId, user);
+  }
+
+  // ── Créneaux horaires (pricingUnit = HOUR) ──────────────────────────────────
+
+  @Get(':id/availability-rules')
+  getAvailabilityRules(@Param('id') id: string): Promise<ListingAvailabilityRule[]> {
+    return this.listingsService.getAvailabilityRules(id);
+  }
+
+  @Post(':id/availability-rules')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  addAvailabilityRule(
+    @Param('id') id: string,
+    @Body() dto: CreateAvailabilityRuleDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ListingAvailabilityRule> {
+    return this.listingsService.addAvailabilityRule(id, dto, user);
+  }
+
+  @Delete(':id/availability-rules/:ruleId')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteAvailabilityRule(
+    @Param('id') id: string,
+    @Param('ruleId') ruleId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<void> {
+    return this.listingsService.deleteAvailabilityRule(id, ruleId, user);
+  }
+
+  @Get(':id/slots')
+  getSlots(@Param('id') id: string, @Query('date') date: string): Promise<SlotDto[]> {
+    return this.listingsService.getSlots(id, date);
+  }
+
+  // Vue hôte (calendrier) : tous les créneaux du jour avec leur statut, pour
+  // sélectionner ceux à bloquer/débloquer — voir SpaceWizard/HostCalendar front.
+  @Get(':id/slots/manage')
+  @UseGuards(JwtAuthGuard)
+  getSlotsForManagement(
+    @Param('id') id: string,
+    @Query('date') date: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ManagedSlotDto[]> {
+    return this.listingsService.getSlotsForManagement(id, date, user);
   }
 }

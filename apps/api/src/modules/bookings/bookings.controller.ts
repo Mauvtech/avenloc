@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { RejectBookingDto } from './dto/reject-booking.dto';
 import { QuoteDto, QuoteResponseDto } from './dto/quote.dto';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -59,8 +60,26 @@ export class BookingsController {
   @Post(':id/reject')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  reject(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.bookingsService.reject(id, user);
+  reject(
+    @Param('id') id: string,
+    @Body() dto: RejectBookingDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.bookingsService.reject(id, dto.reason, user);
+  }
+
+  @Post(':id/check-in')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  checkIn(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.bookingsService.checkIn(id, user);
+  }
+
+  @Post(':id/check-out')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  checkOut(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.bookingsService.checkOut(id, user);
   }
 
   @Post(':id/cancel')

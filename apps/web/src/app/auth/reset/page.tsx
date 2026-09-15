@@ -6,14 +6,27 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/toast';
 
+function ResetTitle() {
+  const name = useSearchParams().get('name');
+  return (
+    <h1 className="text-center text-2xl font-extrabold">
+      {name ? 'Activer mon compte' : 'Nouveau mot de passe'}
+    </h1>
+  );
+}
+
 function ResetForm() {
   const router = useRouter();
   const toast = useToast();
-  const token = useSearchParams().get('token') ?? '';
+  const params = useSearchParams();
+  const token = params.get('token') ?? '';
+  const name = params.get('name');
+  const space = params.get('space');
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mismatch = pw2.length > 0 && pw !== pw2;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,6 +60,11 @@ function ResetForm() {
 
   return (
     <form onSubmit={handleSubmit} className="card space-y-4 p-6">
+      {name && (
+        <p className="text-sm text-muted">
+          Bienvenue, {name} 👋 {space && <>Choisissez un mot de passe pour activer votre compte et publier « {space} ».</>}
+        </p>
+      )}
       <div>
         <label className="label">Nouveau mot de passe</label>
         <input
@@ -68,10 +86,11 @@ function ResetForm() {
           onChange={(e) => setPw2(e.target.value)}
           className="field"
         />
+        {mismatch && <p className="mt-1 text-xs text-danger-fg">Les mots de passe ne correspondent pas.</p>}
       </div>
       {error && <p className="text-sm text-danger-fg">{error}</p>}
-      <button type="submit" disabled={loading} className="btn-primary w-full">
-        {loading ? 'Enregistrement…' : 'Réinitialiser'}
+      <button type="submit" disabled={loading || mismatch} className="btn-primary w-full">
+        {loading ? 'Enregistrement…' : name ? 'Créer mon compte et me connecter' : 'Réinitialiser'}
       </button>
     </form>
   );
@@ -80,7 +99,9 @@ function ResetForm() {
 export default function ResetPasswordPage() {
   return (
     <div className="mx-auto max-w-sm space-y-6 py-8">
-      <h1 className="text-center text-2xl font-extrabold">Nouveau mot de passe</h1>
+      <Suspense fallback={<h1 className="text-center text-2xl font-extrabold">Nouveau mot de passe</h1>}>
+        <ResetTitle />
+      </Suspense>
       <Suspense fallback={<div className="card h-48" />}>
         <ResetForm />
       </Suspense>

@@ -11,13 +11,6 @@ const LIVING = [
 ];
 
 export const PHOTO_CATALOG: Record<string, string[]> = {
-  APARTMENT: LIVING,
-  HOUSE: [
-    'photo-1568605114967-8130f3a36994',
-    'photo-1570129477492-45c003edd2be',
-    'photo-1564013799919-ab600027ffc6',
-  ],
-  ROOM: LIVING,
   OFFICE: [
     'photo-1497366216548-37526070297c',
     'photo-1524758631624-e2822e304c36',
@@ -29,26 +22,22 @@ export const PHOTO_CATALOG: Record<string, string[]> = {
     'photo-1517502884422-41eaead166d4',
     'photo-1552581234-26160f608093',
   ],
+  TRAINING_ROOM: [
+    'photo-1497366754035-f200968a6e72',
+    'photo-1517502884422-41eaead166d4',
+    'photo-1552581234-26160f608093',
+  ],
   WORKSHOP: [
     'photo-1581092160562-40aa08e78837',
     'photo-1504328345606-18bbc8c9d7d1',
     'photo-1600585152220-90363fe7e115',
-  ],
-  WAREHOUSE: [
-    'photo-1553413077-190dd305871c',
-    'photo-1586528116311-ad8dd3c8310d',
-    'photo-1595246140625-573b715d11dc',
   ],
   EVENT_SPACE: [
     'photo-1519167758481-83f550bb49b3',
     'photo-1464366400600-7168b8af9bc3',
     'photo-1511578314322-379afb476865',
   ],
-  PARKING: [
-    'photo-1590674899484-d5640e854aba',
-    'photo-1506521781263-d8422e82f27a',
-    'photo-1573348722427-f1d6819fdf98',
-  ],
+  CREATIVE_STUDIO: LIVING,
   OTHER: LIVING,
 };
 

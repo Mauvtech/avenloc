@@ -5,10 +5,10 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          DEFAULT: 'oklch(0.52 0.16 290 / <alpha-value>)',
-          hover: 'oklch(0.45 0.16 290 / <alpha-value>)',
-          fg: 'oklch(0.44 0.17 290 / <alpha-value>)',
-          tint: 'oklch(0.96 0.028 290 / <alpha-value>)',
+          DEFAULT: 'oklch(0.54 0.25 264 / <alpha-value>)',
+          hover: 'oklch(0.46 0.25 264 / <alpha-value>)',
+          fg: 'oklch(0.46 0.24 264 / <alpha-value>)',
+          tint: 'oklch(0.96 0.045 264 / <alpha-value>)',
         },
         ink: 'oklch(0.21 0.012 265 / <alpha-value>)',
         muted: 'oklch(0.52 0.014 265 / <alpha-value>)',
@@ -46,7 +46,7 @@ module.exports = {
         raised: '0 6px 20px oklch(0.2 0.02 265 / 0.1), 0 2px 6px oklch(0.2 0.02 265 / 0.05)',
         header: '0 1px 0 oklch(0.9 0.005 265 / 1)',
         modal: '0 16px 48px oklch(0.15 0.02 265 / 0.24)',
-        focus: '0 0 0 3px oklch(0.52 0.16 290 / 0.18)',
+        focus: '0 0 0 3px oklch(0.54 0.25 264 / 0.18)',
       },
       keyframes: {
         'fade-in': { from: { opacity: '0' }, to: { opacity: '1' } },

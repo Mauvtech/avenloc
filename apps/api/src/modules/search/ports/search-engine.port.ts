@@ -4,11 +4,13 @@ export interface SearchFilters {
   lat?: number;
   lng?: number;
   radiusKm: number;
+  q?: string;
   type?: ListingType;
   minPrice?: number;
   maxPrice?: number;
   maxGuests?: number;
   amenities?: string[];
+  instantBook?: boolean;
   startDate?: string;
   endDate?: string;
   page: number;
@@ -31,6 +33,8 @@ export interface ListingSearchItem {
   coverPhotoUrl: string | null;
   rating: number | null;
   reviewCount: number;
+  /** Identité de l'hôte vérifiée — voir VerifiedBadge dans le design de référence. */
+  hostVerified: boolean;
 }
 
 export interface SearchResult {
@@ -40,8 +44,16 @@ export interface SearchResult {
   limit: number;
 }
 
+/** Options de filtrage disponibles, dérivées du catalogue publié — voir allTypes/allAmenities/maxPricePossible dans le design de référence. */
+export interface SearchFacets {
+  types: string[];
+  amenities: string[];
+  maxPrice: number;
+}
+
 export const SEARCH_ENGINE_PORT = 'SEARCH_ENGINE_PORT';
 
 export interface SearchEnginePort {
   search(filters: SearchFilters): Promise<SearchResult>;
+  facets(): Promise<SearchFacets>;
 }

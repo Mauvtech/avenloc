@@ -16,7 +16,7 @@ import {
   ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ListingType, PricingUnit, CancellationPolicy } from '@prisma/client';
+import { ListingType, PricingUnit, CancellationPolicy, AccessMethod } from '@prisma/client';
 
 export class UpdateListingDto {
   @IsOptional() @IsEnum(ListingType)
@@ -73,9 +73,34 @@ export class UpdateListingDto {
   @IsOptional() @IsBoolean()
   instantBookEnabled?: boolean;
 
+  @IsOptional() @IsBoolean()
+  rcProRequired?: boolean;
+
+  @IsOptional() @IsString() @MaxLength(3000)
+  houseRules?: string;
+
+  @IsOptional() @IsArray() @ArrayMaxSize(20)
+  faq?: { question: string; reponse: string }[];
+
   @IsOptional() @IsArray() @IsString({ each: true }) @ArrayMaxSize(30)
   amenities?: string[];
 
   @IsOptional() @IsObject()
   specificAttributes?: Record<string, unknown>;
+
+  // ── Accès (voir AccessMethodBlock côté front) ──────────────────────────────
+  @IsOptional() @IsEnum(AccessMethod)
+  accessMethod?: AccessMethod;
+
+  @IsOptional() @IsString() @MaxLength(100)
+  accessCode?: string;
+
+  @IsOptional() @IsString() @MaxLength(100)
+  wifiName?: string;
+
+  @IsOptional() @IsString() @MaxLength(100)
+  wifiPassword?: string;
+
+  @IsOptional() @IsString() @MaxLength(30)
+  contactPhone?: string;
 }

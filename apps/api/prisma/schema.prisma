@@ -29,16 +29,19 @@ enum IdentityStatus {
   VERIFIED
 }
 
+// Types d'espaces professionnels proposés à la location — pas de résidentiel
+// (appartement/maison/chambre) ni de stockage (entrepôt/parking) : hors périmètre produit.
 enum ListingType {
-  APARTMENT
-  HOUSE
-  ROOM
   OFFICE
   MEETING_ROOM
+  TRAINING_ROOM
   WORKSHOP
-  WAREHOUSE
   EVENT_SPACE
-  PARKING
+  BOUTIQUE
+  CABINET
+  RESTAURANT
+  DESK           // "fauteuil vacant" — poste/place unique dans un espace partagé
+  CREATIVE_STUDIO
   OTHER
 }
 
@@ -49,10 +52,20 @@ enum PricingUnit {
 }
 
 enum CancellationPolicy {
-  FLEXIBLE       // remboursement si annulation > 24h avant
-  MODERATE       // remboursement si annulation > 5 jours avant
+  FLEXIBLE       // remboursement 100% si annulation > 24h avant
+  MODERATE       // remboursement 100% si > 3 jours avant, 50% si > 24h avant
   STRICT         // remboursement 50% si annulation > 7 jours avant
   NON_REFUNDABLE
+}
+
+// Méthode de remise des instructions d'accès après confirmation du paiement —
+// voir AccessMethodBlock dans le design de référence.
+enum AccessMethod {
+  CODE        // code temporaire affiché sur la page de confirmation
+  QR          // QR code à scanner sur place
+  KEYBOX      // boîte à clés
+  SMART_LOCK  // serrure connectée, déverrouillage à distance
+  RECEPTION   // accueil sur place, réservation enregistrée au nom du locataire
 }
 
 enum ListingStatus {
@@ -219,8 +232,8 @@ model Listing {
   latitude  Float
   longitude Float
 
-  // Capacité humaine, uniquement pour les types habitables (APARTMENT, HOUSE, ROOM).
-  // Pour les surfaces (m²), places de parking, hauteur sous plafond → specificAttributes.
+  // Capacité (personnes, postes, couverts… selon le type — voir capacityNoun côté front).
+  // Pour les autres mesures (surface, hauteur sous plafond…) → specificAttributes.
   maxGuests Int?
 
   pricingUnit PricingUnit
@@ -238,12 +251,40 @@ model Listing {
 
   cancellationPolicy CancellationPolicy @default(MODERATE)
 
+  // Assurance responsabilité civile professionnelle exigée pour réserver.
+  // Si true, le locataire doit cocher une confirmation à la réservation
+  // (voir Booking.rcProConfirmed) — bloquant tant que non coché.
+  rcProRequired Boolean @default(false)
+
+  // Règlement intérieur affiché sur la fiche. Si non-null, le locataire doit
+  // cocher son acceptation à la réservation (voir Booking.houseRulesAccepted).
+  houseRules String?
+
+  // FAQ de l'annonce — liste de { question, réponse }. Générée automatiquement
+  // à la création (wizard commercial ou hôte) puis éditable librement.
+  // Ex. [{ "question": "Le café est-il inclus ?", "reponse": "Oui, en libre-service." }]
+  faq Json?
+
   // Instant Book : si true, la réservation est confirmée automatiquement dès paiement autorisé.
   // Si false : statut PENDING jusqu'à validation explicite de l'hôte (voir Booking.hostApprovalDeadline).
   // Impact Stripe : false → capture_method: 'manual' sur le PaymentIntent (autorisation différée).
   instantBookEnabled Boolean @default(false)
 
-  // Tags normalisés — valeurs contrôlées par une enum applicative (non Prisma)
+  // true si la fiche a été créée par un commercial pour le compte de cet hôte
+  // (voir POST /listings/commercial) — affiche une bannière de vérification tant
+  // que l'hôte n'a pas lui-même enregistré une modification sur l'annonce.
+  createdByCommercial Boolean @default(false)
+
+  // ── Accès (affiché au locataire uniquement après paiement confirmé) ────────
+  accessMethod    AccessMethod @default(CODE)
+  accessCode      String?      // code temporaire ou code de la boîte à clés
+  wifiName        String?
+  wifiPassword    String?
+  contactPhone    String?      // contact sur place, indicatif si différent du téléphone du profil hôte
+
+  // Tags libres saisis par l'hôte ou le commercial (ex. "Wi-Fi", "Terrasse").
+  // Aucune enum fermée n'est appliquée côté validation (CreateListingDto) —
+  // le commentaire précédent suggérant une liste contrôlée était erroné/aspirationnel.
   amenities String[]
 
   // Attributs spécifiques au type de local — exemples par type :
@@ -252,6 +293,11 @@ model Listing {
   //   WAREHOUSE          : { "surface_m2": 500, "height_m": 6.5, "loading_dock": true }
   //   PARKING            : { "spots": 2, "covered": true, "ev_charger": false }
   //   OFFICE             : { "surface_m2": 25, "standing_desk": true }
+  //   BOUTIQUE           : { "surface_m2": 30, "shopfront": true, "storage_room": false }
+  //   CABINET            : { "waiting_room": true, "soundproof": true }
+  //   RESTAURANT         : { "seats": 40, "kitchen_equipped": true, "terrace": false }
+  //   DESK               : { "monitor": true, "standing_desk": false }
+  //   CREATIVE_STUDIO    : { "lighting_kit": true, "backdrop_colors": ["white", "black"] }
   specificAttributes Json?
 
   createdAt DateTime @default(now())
@@ -260,6 +306,7 @@ model Listing {
   host           User                  @relation(fields: [hostId], references: [id])
   photos         ListingPhoto[]
   availabilities ListingAvailability[]
+  availabilityRules ListingAvailabilityRule[]
   bookings       Booking[]
   reviews        Review[]
   conversations  Conversation[]
@@ -286,16 +333,51 @@ model ListingPhoto {
 
 // Fenêtres de disponibilité définies par l'hôte.
 // isAvailable = false → blocage manuel (déplacement personnel, travaux, etc.)
+// Précision timestamp (et non date) depuis la migration 0007 : nécessaire pour
+// bloquer des créneaux horaires précis sur les annonces pricingUnit = HOUR. Pour
+// NIGHT/DAY, l'heure reste à 00:00 par convention (posée par le front), donc le
+// comportement est inchangé pour ces cas.
 model ListingAvailability {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   listingId   String   @db.Uuid
-  startDate   DateTime @db.Date
-  endDate     DateTime @db.Date // exclusif, même convention que Booking
+  startDate   DateTime
+  endDate     DateTime // exclusif, même convention que Booking
   isAvailable Boolean  @default(true)
 
   listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
   @@index([listingId])
+}
+
+// Règle de disponibilité récurrente hebdomadaire — uniquement pertinente pour
+// Listing.pricingUnit = HOUR. Une annonce peut avoir plusieurs règles (ex. horaires
+// différents lun-ven vs samedi). ListingAvailability (ci-dessus) reste le mécanisme
+// pour les exceptions ponctuelles (fermeture, blocage manuel d'un créneau).
+//
+// Générateur de créneaux (front + back) : pour un jour donné, on prend les règles dont
+// dayOfWeek correspond, on découpe [startTime, endTime] en tranches de minDurationMinutes,
+// on retire tout ce qui chevauche une ListingAvailability(isAvailable=false) ou un Booking
+// existant (PENDING/CONFIRMED), et on retire les créneaux commençant avant
+// now() + minLeadTimeMinutes.
+model ListingAvailabilityRule {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  listingId String @db.Uuid
+
+  dayOfWeek Int // 0 = dimanche ... 6 = samedi (convention JS Date#getDay())
+
+  startTime String // "08:00" — heure locale, format HH:mm
+  endTime   String // "19:00"
+
+  minDurationMinutes  Int @default(60)
+  minLeadTimeMinutes  Int @default(0) // délai minimum avant réservation
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@index([listingId, dayOfWeek])
 }
 
 // ─── BOOKINGS ─────────────────────────────────────────────────────────────────
@@ -307,10 +389,17 @@ model Booking {
   status    BookingStatus @default(PENDING)
 
   // Convention endDate EXCLUSIF : la réservation couvre [startDate, endDate[.
-  // Exemple : du 10 au 12 juillet = startDate 2024-07-10, endDate 2024-07-12 → 2 nuits.
+  // Exemple (pricingUnit = NIGHT) : du 10 au 12 juillet = startDate 2024-07-10, endDate 2024-07-12 → 2 nuits.
+  // Exemple (pricingUnit = HOUR)  : startDate 2024-07-10T14:00, endDate 2024-07-10T16:00 → 2 heures.
+  //
+  // Champ DateTime (et non @db.Date) depuis la migration 0005 : nécessaire pour porter
+  // l'heure exacte des réservations horaires. Pour NIGHT/DAY, l'heure est ignorée par
+  // PricingService mais reste à 00:00 par convention (posée par le front).
   // Contrainte CHECK (startDate < endDate) garantie en migration brute (0003).
-  startDate DateTime @db.Date
-  endDate   DateTime @db.Date
+  // Contrainte anti-chevauchement : voir migration 0005 (tsrange, remplace le daterange de 0003
+  // pour les annonces pricingUnit = HOUR).
+  startDate DateTime
+  endDate   DateTime
 
   // unitCount = nombre d'unités facturées (nuits, heures ou jours).
   // L'interprétation dépend de Listing.pricingUnit — pas de champ redondant "nights".
@@ -330,13 +419,41 @@ model Booking {
   totalAmount Decimal @db.Decimal(10, 2)
 
   guestCount  Int     @default(1)
-  guestNote   String? // message / instructions du locataire pour l'hôte
-  arrivalTime String? // heure d'arrivée prévue (ex. "14:30")
+  guestNote   String? // message / instructions libres du locataire pour l'hôte (facultatif)
+  arrivalTime String? // heure d'arrivée prévue (ex. "14:30") — indicatif, distinct du créneau réservé
+
+  // Activité/usage déclaré par le locataire. Obligatoire côté validation applicative
+  // quand Listing.instantBookEnabled = false — c'est sur cette base que l'hôte accepte/refuse.
+  // Distinct de guestNote (qui reste un message libre optionnel).
+  activityDescription String?
+
+  // Confirmation du locataire qu'il dispose d'une RC Pro en cours de validité.
+  // Doit être true avant paiement si Listing.rcProRequired = true (vérifié en service).
+  rcProConfirmed Boolean @default(false)
+
+  // Acceptation du règlement intérieur de l'annonce (Listing.houseRules).
+  // Toujours requis si Listing.houseRules est renseigné.
+  houseRulesAccepted Boolean @default(false)
+
+  // Horodatage du check-in / check-out réel, saisis par le locataire (confirmation manuelle).
+  // Alimentent les rappels automatiques et l'historique "en cours" / "passée" côté front.
+  checkedInAt  DateTime?
+  checkedOutAt DateTime?
+
+  // Motif de refus saisi par l'hôte — affiché au locataire. Obligatoire à la rejection
+  // (voir BookingsService.reject). Null pour toute autre transition de statut.
+  rejectionReason String?
 
   // Deadline de validation hôte. Null si Listing.instantBookEnabled = true.
   // Calculé à la création : now() + PlatformConfig.hostApprovalWindowHours.
   // Le job de nettoyage annule les PENDING dont hostApprovalDeadline est dépassée.
   hostApprovalDeadline DateTime?
+
+  // Horodatage de l'approbation hôte — posé même si le paiement n'a pas encore
+  // eu lieu (le locataire a pu ne pas encore payer au moment de l'approbation).
+  // Permet de distinguer « en attente de l'hôte » de « approuvée, en attente de
+  // votre paiement » côté locataire. Voir BookingsService.approve.
+  hostApprovedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

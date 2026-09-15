@@ -8,6 +8,7 @@ import { isAuthenticated, loginHref } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
 import StripePayment from '@/components/stripe-payment';
 import DepositCard from '@/components/deposit-card';
+import AccessMethodBlock from '@/components/access-method-block';
 import { useToast } from '@/components/toast';
 import { useConfirm } from '@/components/confirm';
 import { BackLink, PageLoader, StarRating, Stepper } from '@/components/ui';
@@ -45,7 +46,12 @@ export default function BookingDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
   const [reviewSent, setReviewSent] = useState(false);
+  const [alreadyReviewed, setAlreadyReviewed] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
+  const [reportingIssue, setReportingIssue] = useState(false);
+  const [issueText, setIssueText] = useState('');
+  const [issueSent, setIssueSent] = useState(false);
+  const [issueSending, setIssueSending] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -64,6 +70,13 @@ export default function BookingDetailPage() {
       .then((l) => l && setListing(l))
       .catch(() => router.replace('/bookings'))
       .finally(() => setLoading(false));
+    api.reviews
+      .pending()
+      .then((pending) => {
+        const stillPending = pending.some((p) => p.bookingId === id && p.possibleTargets.includes('LISTING'));
+        setAlreadyReviewed(!stillPending);
+      })
+      .catch(() => {});
   }, [id, router]);
 
   async function handleCancel() {
@@ -87,6 +100,26 @@ export default function BookingDetailPage() {
     }
   }
 
+  async function handleCheckIn() {
+    try {
+      const updated = await api.bookings.checkIn(id);
+      setBooking((b) => (b ? { ...b, checkedInAt: updated.checkedInAt } : b));
+      toast.success('Check-in confirmé');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Check-in impossible');
+    }
+  }
+
+  async function handleCheckOut() {
+    try {
+      const updated = await api.bookings.checkOut(id);
+      setBooking((b) => (b ? { ...b, checkedOutAt: updated.checkedOutAt } : b));
+      toast.success('Check-out confirmé, merci !');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Check-out impossible');
+    }
+  }
+
   async function handlePay() {
     setPayLoading(true);
     setError(null);
@@ -102,6 +135,22 @@ export default function BookingDetailPage() {
       setError(err instanceof Error ? err.message : 'Erreur de paiement');
     } finally {
       setPayLoading(false);
+    }
+  }
+
+  async function handleReportIssue() {
+    if (!issueText.trim()) return;
+    setIssueSending(true);
+    try {
+      const conv = await api.conversations.create({ listingId: booking!.listingId });
+      await api.conversations.send(conv.id, `🛠 Problème signalé : ${issueText.trim()}`);
+      setIssueSent(true);
+      setReportingIssue(false);
+      toast.success('Signalement envoyé à l’hôte');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Envoi impossible');
+    } finally {
+      setIssueSending(false);
     }
   }
 
@@ -204,11 +253,45 @@ export default function BookingDetailPage() {
           </p>
         )}
 
+        {booking.status === 'CANCELLED' && booking.rejectionReason && (
+          <p className="rounded-md bg-danger-tint px-3 py-2 text-xs text-danger-fg">
+            <span className="font-semibold">Motif du refus : </span>
+            {booking.rejectionReason}
+          </p>
+        )}
+
         {booking.guestNote && (
           <p className="rounded-md bg-canvas px-3 py-2 text-sm text-ink/80">
             <span className="text-muted">Votre message : </span>
             {booking.guestNote}
           </p>
+        )}
+
+        {booking.activityDescription && (
+          <p className="rounded-md bg-canvas px-3 py-2 text-sm text-ink/80">
+            <span className="text-muted">Activité déclarée : </span>
+            {booking.activityDescription}
+          </p>
+        )}
+
+        {booking.status === 'CONFIRMED' && isTenant && (
+          <div className="flex gap-2">
+            {!booking.checkedInAt && (
+              <button onClick={handleCheckIn} className="btn-primary flex-1 py-2.5 text-sm">
+                Confirmer le check-in
+              </button>
+            )}
+            {booking.checkedInAt && !booking.checkedOutAt && (
+              <button onClick={handleCheckOut} className="btn-primary flex-1 py-2.5 text-sm">
+                Confirmer le check-out
+              </button>
+            )}
+            {booking.checkedInAt && booking.checkedOutAt && (
+              <p className="flex-1 rounded-md bg-canvas px-3 py-2.5 text-center text-sm text-muted">
+                Check-out confirmé — merci !
+              </p>
+            )}
+          </div>
         )}
 
         {booking.status === 'CONFIRMED' && (
@@ -230,6 +313,61 @@ export default function BookingDetailPage() {
           </button>
         )}
       </div>
+
+      {/* Accès — affiché au locataire uniquement une fois le paiement confirmé */}
+      {isTenant && booking.status === 'CONFIRMED' && listing && (
+        <div className="space-y-4">
+          <div className="card space-y-2 p-5 text-sm">
+            <h2 className="section-title mb-1">Accès</h2>
+            <Row k="Adresse" v={`${listing.addressLine1}, ${listing.postalCode} ${listing.city}`} />
+            {listing.wifiName && (
+              <Row
+                k="Wi-Fi"
+                v={`Réseau « ${listing.wifiName} »${listing.wifiPassword ? ` — mot de passe : ${listing.wifiPassword}` : ''}`}
+              />
+            )}
+            {listing.contactPhone && <Row k="Contact sur place" v={listing.contactPhone} />}
+          </div>
+
+          <AccessMethodBlock method={listing.accessMethod} accessCode={listing.accessCode} />
+
+          <div className="card space-y-2.5 p-5">
+            {issueSent ? (
+              <p className="text-sm text-success-fg">✓ Signalement envoyé à l&apos;hôte.</p>
+            ) : reportingIssue ? (
+              <>
+                <label className="label">Décrivez le problème rencontré</label>
+                <textarea
+                  rows={3}
+                  value={issueText}
+                  onChange={(e) => setIssueText(e.target.value)}
+                  className="field resize-y"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleReportIssue}
+                    disabled={issueSending || !issueText.trim()}
+                    className="btn-primary btn-sm"
+                  >
+                    {issueSending ? 'Envoi…' : 'Envoyer'}
+                  </button>
+                  <button onClick={() => setReportingIssue(false)} className="btn-ghost btn-sm">
+                    Annuler
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button onClick={() => setReportingIssue(true)} className="btn-ghost w-full">
+                Signaler un problème ou contacter l&apos;hôte
+              </button>
+            )}
+          </div>
+
+          <Link href="/" className="btn-ghost w-full justify-center">
+            Retour à la recherche
+          </Link>
+        </div>
+      )}
 
       {/* Caution */}
       {(booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') && meId && (
@@ -265,7 +403,7 @@ export default function BookingDetailPage() {
       {booking.status === 'COMPLETED' && (
         <div id="review" className="card space-y-4 p-6">
           <h2 className="section-title">Laisser un avis</h2>
-          {reviewSent ? (
+          {reviewSent || alreadyReviewed ? (
             <p className="text-sm font-semibold text-success-fg">Avis envoyé, merci !</p>
           ) : (
             <form onSubmit={handleReview} className="space-y-3">

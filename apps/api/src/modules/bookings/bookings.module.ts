@@ -5,9 +5,11 @@ import { BookingsController } from './bookings.controller';
 import { PricingService } from './pricing.service';
 import { CleanupExpiredBookingsJob } from './jobs/cleanup-expired-bookings.job';
 import { MessagingModule } from '@/modules/messaging/messaging.module';
+import { PaymentsModule } from '@/modules/payments/payments.module';
+import { DepositsModule } from '@/modules/deposits/deposits.module';
 
 @Module({
-  imports: [MessagingModule, ScheduleModule],
+  imports: [MessagingModule, PaymentsModule, DepositsModule, ScheduleModule],
   providers: [BookingsService, PricingService, CleanupExpiredBookingsJob],
   controllers: [BookingsController],
   exports: [PricingService],

@@ -8,14 +8,79 @@ import { api } from '@/lib/api';
 import Avatar from '@/components/avatar';
 import type { User } from '@/lib/types';
 
-function Logo() {
+export function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2.5">
       <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-[15px] font-extrabold text-white shadow-xs">
-        A
+        S
       </span>
-      <span className="text-[17px] font-extrabold tracking-tight">Aven</span>
+      <span className="flex items-baseline gap-1.5">
+        <span
+          className="text-[19px] font-bold tracking-tight text-ink"
+          style={{ fontFamily: 'var(--font-space-grotesk)' }}
+        >
+          Sppot
+        </span>
+        <span className="text-[13px] font-medium text-muted">by Aven</span>
+      </span>
     </Link>
+  );
+}
+
+type SpaceMode = 'client' | 'hote' | 'commercial';
+
+const SPACE_LABEL: Record<SpaceMode, string> = {
+  client: 'Espace client',
+  hote: 'Espace hôte',
+  commercial: 'Commercial',
+};
+
+const SPACE_DESTINATION: Record<SpaceMode, string> = {
+  client: '/bookings',
+  hote: '/host',
+  commercial: '/commercial',
+};
+
+// Switcher à 3 espaces (client / hôte / commercial) — chaque destination exige
+// un compte : si l'utilisateur n'est pas connecté, on l'envoie d'abord sur
+// l'écran de connexion/inscription (avec retour automatique une fois connecté)
+// avant d'accéder au contenu. La recherche reste une landing indépendante,
+// accessible uniquement via le logo.
+function SpaceSwitcher({ className = '' }: { className?: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const active: SpaceMode | null = pathname.startsWith('/host')
+    ? 'hote'
+    : pathname.startsWith('/commercial')
+      ? 'commercial'
+      : pathname.startsWith('/bookings') ||
+          pathname.startsWith('/profile') ||
+          pathname.startsWith('/conversations') ||
+          pathname.startsWith('/wishlist')
+        ? 'client'
+        : null;
+
+  function go(mode: SpaceMode) {
+    const dest = SPACE_DESTINATION[mode];
+    router.push(isAuthenticated() ? dest : loginHref(dest));
+  }
+
+  return (
+    <div className={`flex gap-1 rounded-lg bg-canvas p-[3px] ${className}`}>
+      {(['client', 'hote', 'commercial'] as SpaceMode[]).map((mode) => (
+        <button
+          key={mode}
+          type="button"
+          onClick={() => go(mode)}
+          className={`flex-1 whitespace-nowrap rounded-md px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+            active === mode ? 'bg-surface text-ink shadow-xs' : 'text-muted hover:text-ink'
+          }`}
+        >
+          {SPACE_LABEL[mode]}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -122,34 +187,18 @@ export default function Nav() {
       ].filter((l) => !l.hostOnly || user.roles.includes('HOST'))
     : [];
 
-  const NavLink = ({ href, label, badge }: LinkDef) => (
-    <Link
-      href={href}
-      className={`relative rounded-md px-2.5 py-1.5 text-sm font-semibold transition-colors ${
-        isActive(href) ? 'bg-canvas text-ink' : 'text-muted hover:bg-canvas hover:text-ink'
-      }`}
-    >
-      {label}
-      {badge ? (
-        <span className="absolute -right-0.5 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-white">
-          {badge > 9 ? '9+' : badge}
-        </span>
-      ) : null}
-    </Link>
-  );
-
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-surface/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2.5 sm:px-6">
-        <Logo />
+        <div className="flex items-center gap-4">
+          <Logo />
+          <SpaceSwitcher className="hidden md:flex" />
+        </div>
 
         {/* ── Desktop ─────────────────────────────────────────────── */}
         <div className="hidden min-h-[36px] items-center gap-1 md:flex">
           {!mounted ? null : user ? (
             <>
-              {links.map((l) => (
-                <NavLink key={l.href} {...l} />
-              ))}
               <div ref={menuRef} className="relative ml-1.5">
                 <button
                   onClick={() => setMenuOpen((o) => !o)}
@@ -168,6 +217,9 @@ export default function Nav() {
                       <p className="truncate text-xs text-muted">{user.email}</p>
                     </div>
                     <MenuItem href="/profile" label="Mon profil" />
+                    <MenuItem href="/bookings" label="Réservations" />
+                    <MenuItem href="/wishlist" label="Favoris" />
+                    <MenuItem href="/conversations" label="Messages" badge={unread} />
                     {user.roles.includes('HOST') ? (
                       <MenuItem href="/host" label="Espace hôte" />
                     ) : (
@@ -236,6 +288,10 @@ export default function Nav() {
               </button>
             </div>
 
+            <div className="border-b border-line p-3">
+              <SpaceSwitcher className="w-full" />
+            </div>
+
             {!mounted ? null : user ? (
               <div className="flex flex-1 flex-col overflow-y-auto">
                 <Link
@@ -300,13 +356,18 @@ export default function Nav() {
   );
 }
 
-function MenuItem({ href, label }: { href: string; label: string }) {
+function MenuItem({ href, label, badge }: { href: string; label: string; badge?: number }) {
   return (
     <Link
       href={href}
-      className="block px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas"
+      className="flex items-center justify-between px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas"
     >
       {label}
+      {badge ? (
+        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-white">
+          {badge > 9 ? '9+' : badge}
+        </span>
+      ) : null}
     </Link>
   );
 }

@@ -4,16 +4,18 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isAuthenticated, loginHref, registerHref } from '@/lib/auth';
+import { isAuthenticated, loginHref } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
-import DateRangePicker from '@/components/date-range-picker';
-import PriceBreakdown from '@/components/price-breakdown';
 import Avatar from '@/components/avatar';
 import ListingCard from '@/components/listing-card';
-import { BackLink, Skeleton, StarRating } from '@/components/ui';
+import { Breadcrumbs, Skeleton, StarRating, VerifiedBadge } from '@/components/ui';
 import { useToast } from '@/components/toast';
 import { eur, eurRound } from '@/lib/format';
 import {
+  ACCESS_METHOD_LABEL,
+  amenityLabel,
+  attributeLabel,
+  CANCELLATION_DETAIL,
   CANCELLATION_LABEL,
   capacityNoun,
   LISTING_STATUS_CLASS,
@@ -21,11 +23,10 @@ import {
   typeLabel,
   UNIT_LABEL_SHORT,
 } from '@/lib/listing';
-import type { Listing, Quote, ReviewList, SearchResultItem, User } from '@/lib/types';
+import type { Listing, ReviewList, SearchResultItem, User } from '@/lib/types';
 
 const attrValue = (v: unknown) =>
   typeof v === 'boolean' ? (v ? 'Oui' : 'Non') : v == null ? '—' : String(v);
-const humanize = (k: string) => k.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 
 export default function ListingPage() {
   const { id } = useParams<{ id: string }>();
@@ -36,21 +37,12 @@ export default function ListingPage() {
   const [listing, setListing] = useState<Listing | null>(null);
   const [reviews, setReviews] = useState<ReviewList | null>(null);
   const [me, setMe] = useState<User | null>(null);
-  const [loggedIn, setLoggedIn] = useState(false);
   const [similar, setSimilar] = useState<SearchResultItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [lightbox, setLightbox] = useState<string | null>(null);
-
-  const [range, setRange] = useState<{ startDate: string; endDate: string } | null>(null);
-  const [quote, setQuote] = useState<Quote | null>(null);
-  const [quoting, setQuoting] = useState(false);
-  const [bookingForm, setBookingForm] = useState({ guestCount: '1', arrivalTime: '', guestNote: '' });
-  const [bookingError, setBookingError] = useState<string | null>(null);
-  const [bookingLoading, setBookingLoading] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
 
   useEffect(() => {
-    setLoggedIn(isAuthenticated());
     Promise.all([
       api.listings.getById(id),
       api.reviews.byListing(id),
@@ -64,23 +56,6 @@ export default function ListingPage() {
           .search(`type=${l.type}&limit=7`)
           .then((res) => setSimilar(res.listings.filter((x) => x.id !== l.id).slice(0, 3)))
           .catch(() => setSimilar([]));
-
-        // Restaure la sélection en cours si l'utilisateur revient d'une
-        // connexion/inscription déclenchée depuis cette même annonce.
-        try {
-          const raw = sessionStorage.getItem(`aven:draft:${id}`);
-          if (raw) {
-            const draft = JSON.parse(raw) as {
-              range?: typeof range;
-              bookingForm?: typeof bookingForm;
-            };
-            if (draft.range) setRange(draft.range);
-            if (draft.bookingForm) setBookingForm(draft.bookingForm);
-            sessionStorage.removeItem(`aven:draft:${id}`);
-          }
-        } catch {
-          /* ignore */
-        }
       })
       .catch(() => router.replace('/'))
       .finally(() => setLoading(false));
@@ -93,68 +68,6 @@ export default function ListingPage() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [lightbox]);
-
-  // Devis live dès que les deux dates sont choisies.
-  useEffect(() => {
-    if (!range?.startDate || !range?.endDate) {
-      setQuote(null);
-      return;
-    }
-    let cancelled = false;
-    setQuoting(true);
-    api.bookings
-      .quote({ listingId: id, startDate: range.startDate, endDate: range.endDate })
-      .then((q) => !cancelled && setQuote(q))
-      .catch(() => !cancelled && setQuote(null))
-      .finally(() => !cancelled && setQuoting(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [range, id]);
-
-  async function handleBook(e: React.FormEvent) {
-    e.preventDefault();
-    if (!isAuthenticated()) return router.push(loginHref(pathname));
-    if (!range?.startDate || !range?.endDate) {
-      setBookingError('Choisissez vos dates d’arrivée et de départ.');
-      return;
-    }
-    setBookingError(null);
-    setBookingLoading(true);
-    try {
-      const booking = await api.bookings.create({
-        listingId: id,
-        startDate: range.startDate,
-        endDate: range.endDate,
-        guestCount: parseInt(bookingForm.guestCount, 10),
-        arrivalTime: bookingForm.arrivalTime || undefined,
-        guestNote: bookingForm.guestNote || undefined,
-      });
-      router.push(`/bookings/${booking.id}`);
-    } catch (err) {
-      setBookingError(err instanceof Error ? err.message : 'Erreur lors de la réservation');
-    } finally {
-      setBookingLoading(false);
-    }
-  }
-
-  function saveDraft() {
-    try {
-      sessionStorage.setItem(`aven:draft:${id}`, JSON.stringify({ range, bookingForm }));
-    } catch {
-      /* ignore */
-    }
-  }
-
-  async function handleContact() {
-    if (!isAuthenticated()) return router.push(loginHref(pathname));
-    try {
-      await api.conversations.create({ listingId: id });
-      router.push('/conversations');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Impossible d’ouvrir la conversation');
-    }
-  }
 
   async function toggleStatus() {
     if (!listing) return;
@@ -180,6 +93,7 @@ export default function ListingPage() {
   if (!listing) return null;
 
   const unit = UNIT_LABEL_SHORT[listing.pricingUnit] ?? listing.pricingUnit;
+  const cancellationDetail = CANCELLATION_DETAIL[listing.cancellationPolicy];
   const isOwner = !!me && me.id === listing.hostId;
   const paymentsReady = listing.hostPaymentsReady !== false;
   const photos = listing.photos;
@@ -188,10 +102,11 @@ export default function ListingPage() {
   const memberSince = host?.createdAt
     ? new Date(host.createdAt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
     : null;
+  const reserveLabel = listing.pricingUnit === 'HOUR' ? 'Choisir un créneau' : 'Réserver';
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-20 md:pb-0">
-      <BackLink href="/">Retour aux annonces</BackLink>
+      <Breadcrumbs items={[{ label: 'Espaces', href: '/' }, { label: listing.title }]} />
 
       {isOwner && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand/30 bg-brand-tint/60 px-4 py-3 text-sm">
@@ -203,24 +118,61 @@ export default function ListingPage() {
         </div>
       )}
 
+      {/* Galerie : 1 grande photo + grille de 4 miniatures */}
+      {photos.length === 0 && (
+        <div className="flex h-40 items-center justify-center gap-3 rounded-lg border border-dashed border-line bg-canvas text-sm text-muted sm:h-56">
+          <CategoryIcon type={listing.type} size={30} className="text-line" />
+          Aucune photo pour cette annonce
+        </div>
+      )}
+      {photos.length > 0 && (
+        <div className="space-y-2">
+          <button
+            onClick={() => setLightbox(photos[0].url)}
+            className="group block aspect-[16/8] w-full overflow-hidden rounded-lg bg-canvas"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photos[0].url}
+              alt={listing.title}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            />
+          </button>
+          {photos.length > 1 && (
+            <div className="grid grid-cols-4 gap-2">
+              {photos.slice(1, 5).map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setLightbox(p.url)}
+                  className="group aspect-square overflow-hidden rounded-lg bg-canvas"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={p.url}
+                    alt=""
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* En-tête */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="badge">
+      <div className="space-y-1.5">
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-2xl font-extrabold leading-tight sm:text-3xl">{listing.title}</h1>
+          {host?.verified && <VerifiedBadge className="mt-1.5 flex-none" />}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+          <span className="inline-flex items-center gap-1">
             <CategoryIcon type={listing.type} size={13} />
             {typeLabel(listing.type)}
           </span>
-          {listing.instantBookEnabled ? (
-            <span className="rounded-full bg-success-tint px-2.5 py-0.5 text-[11px] font-bold text-success-fg">
-              ⚡ Réservation instantanée
-            </span>
-          ) : (
-            <span className="rounded-full border border-line px-2.5 py-0.5 text-[11px] font-bold text-muted">
-              Sur validation de l&apos;hôte
-            </span>
-          )}
+          <span aria-hidden>·</span>
+          <span>{listing.instantBookEnabled ? '⚡ Réservation instantanée' : "Sur validation de l'hôte"}</span>
         </div>
-        <h1 className="text-2xl font-extrabold leading-tight sm:text-3xl">{listing.title}</h1>
         <p className="text-sm text-muted">
           {rating !== null && (
             <span className="font-semibold text-ink">
@@ -232,49 +184,6 @@ export default function ListingPage() {
           {listing.city}
         </p>
       </div>
-
-      {/* Galerie */}
-      {photos.length === 0 && (
-        <div className="flex h-40 items-center justify-center gap-3 rounded-lg border border-dashed border-line bg-canvas text-sm text-muted sm:h-56">
-          <CategoryIcon type={listing.type} size={30} className="text-line" />
-          Aucune photo pour cette annonce
-        </div>
-      )}
-      {photos.length === 1 && (
-        <button
-          onClick={() => setLightbox(photos[0].url)}
-          className="group block aspect-[16/9] w-full overflow-hidden rounded-lg bg-canvas"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={photos[0].url}
-            alt={listing.title}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-          />
-        </button>
-      )}
-      {photos.length >= 2 && (
-        <div className="grid gap-2 overflow-hidden rounded-lg sm:aspect-[2.4/1] sm:grid-cols-4 sm:grid-rows-2">
-          {photos.slice(0, 5).map((p, i) => (
-            <button
-              key={p.id}
-              onClick={() => setLightbox(p.url)}
-              className={`group relative overflow-hidden bg-canvas ${
-                i === 0
-                  ? 'aspect-[16/10] sm:col-span-2 sm:row-span-2 sm:aspect-auto'
-                  : 'hidden aspect-[4/3] sm:block'
-              }`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={p.url}
-                alt={i === 0 ? listing.title : ''}
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-              />
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className="grid gap-8 md:grid-cols-[1fr_360px]">
         {/* Colonne principale */}
@@ -306,7 +215,7 @@ export default function ListingPage() {
               <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
                 {specificAttrs.map(([key, value]) => (
                   <div key={key} className="rounded-md border border-line px-3 py-2">
-                    <div className="text-[11px] text-muted">{humanize(key)}</div>
+                    <div className="text-[11px] text-muted">{attributeLabel(key)}</div>
                     <div className="text-sm font-bold">{attrValue(value)}</div>
                   </div>
                 ))}
@@ -326,11 +235,49 @@ export default function ListingPage() {
               <h2 className="section-title mb-3">Équipements</h2>
               <div className="flex flex-wrap gap-2">
                 {listing.amenities.map((a) => (
-                  <span key={a} className="rounded-full bg-canvas px-3 py-1 text-sm capitalize text-ink/80">
-                    {a}
+                  <span key={a} className="rounded-full bg-canvas px-3 py-1 text-sm text-ink/80">
+                    {amenityLabel(a)}
                   </span>
                 ))}
               </div>
+            </section>
+          )}
+
+          {listing.faq && listing.faq.length > 0 && (
+            <section>
+              <h2 className="section-title mb-3">Questions fréquentes</h2>
+              <div className="divide-y divide-line">
+                {listing.faq.map((item, i) => (
+                  <details key={i} className="py-2.5">
+                    <summary className="cursor-pointer text-sm font-semibold text-ink">
+                      {item.question}
+                    </summary>
+                    <p className="mt-1.5 text-sm text-muted">{item.reponse}</p>
+                  </details>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {(listing.rcProRequired || listing.houseRules) && (
+            <section>
+              <h2 className="section-title mb-2">À prévoir avant de réserver</h2>
+              <ul className="space-y-1 text-sm text-muted">
+                {listing.rcProRequired && (
+                  <li>• Une assurance responsabilité civile professionnelle (RC Pro) valide</li>
+                )}
+                {listing.houseRules && (
+                  <li>• L&apos;acceptation du règlement intérieur de l&apos;espace</li>
+                )}
+              </ul>
+              {listing.houseRules && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-semibold text-brand-fg">
+                    Voir le règlement intérieur
+                  </summary>
+                  <p className="mt-1.5 whitespace-pre-wrap text-xs text-muted">{listing.houseRules}</p>
+                </details>
+              )}
             </section>
           )}
 
@@ -363,7 +310,21 @@ export default function ListingPage() {
 
           <section>
             <h2 className="section-title mb-2">Conditions</h2>
-            <p className="text-sm text-muted">
+            {listing.amenities.includes('parking') && (
+              <p className="text-sm text-muted">
+                Parking : <span className="font-semibold text-ink">Disponible sur place</span>
+              </p>
+            )}
+            {listing.amenities.includes('pmr') && (
+              <p className="mt-1 text-sm text-muted">
+                Accessibilité : <span className="font-semibold text-ink">Accès PMR</span>
+              </p>
+            )}
+            <p className="mt-1 text-sm text-muted">
+              Méthode d&apos;accès :{' '}
+              <span className="font-semibold text-ink">{ACCESS_METHOD_LABEL[listing.accessMethod] ?? listing.accessMethod}</span>
+            </p>
+            <p className="mt-1 text-sm text-muted">
               Annulation : <span className="font-semibold text-ink">
                 {CANCELLATION_LABEL[listing.cancellationPolicy] ?? listing.cancellationPolicy}
               </span>
@@ -372,6 +333,34 @@ export default function ListingPage() {
                 détails
               </Link>
             </p>
+            {listing.depositAmount && Number(listing.depositAmount) > 0 && (
+              <p className="mt-1 text-sm text-muted">
+                Caution :{' '}
+                <span className="font-semibold text-ink">{eur(listing.depositAmount)}</span> (empreinte
+                bancaire, restituée après usage sauf réclamation justifiée)
+              </p>
+            )}
+            {cancellationDetail && (
+              <details className="mt-2">
+                <summary className="cursor-pointer text-xs font-semibold text-brand-fg">
+                  Détail no-show, retard et dépassement
+                </summary>
+                <div className="mt-2 space-y-1 text-xs text-muted">
+                  <p>
+                    <span className="font-semibold text-ink">No-show : </span>
+                    {cancellationDetail.noShow}
+                  </p>
+                  <p>
+                    <span className="font-semibold text-ink">Retard : </span>
+                    {cancellationDetail.retard}
+                  </p>
+                  <p>
+                    <span className="font-semibold text-ink">Dépassement : </span>
+                    {cancellationDetail.depassement}
+                  </p>
+                </div>
+              </details>
+            )}
           </section>
 
           {reviews && reviews.total > 0 && (
@@ -463,105 +452,16 @@ export default function ListingPage() {
                   </p>
                 )}
 
-                <form id="booking" onSubmit={handleBook} className="scroll-mt-20 space-y-3">
-                  <div>
-                    <label className="label">Dates</label>
-                    <DateRangePicker listingId={listing.id} value={range} onChange={setRange} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="label">Locataires</label>
-                      <input
-                        type="number"
-                        min="1"
-                        required
-                        value={bookingForm.guestCount}
-                        onChange={(e) => setBookingForm((f) => ({ ...f, guestCount: e.target.value }))}
-                        className="field"
-                      />
-                    </div>
-                    <div>
-                      <label className="label">Arrivée</label>
-                      <input
-                        type="time"
-                        value={bookingForm.arrivalTime}
-                        onChange={(e) => setBookingForm((f) => ({ ...f, arrivalTime: e.target.value }))}
-                        className="field"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="label">
-                      Message pour l&apos;hôte <span className="font-normal">(optionnel)</span>
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={bookingForm.guestNote}
-                      onChange={(e) => setBookingForm((f) => ({ ...f, guestNote: e.target.value }))}
-                      className="field resize-y"
-                    />
-                  </div>
-
-                  {quoting && <Skeleton className="h-24 w-full" />}
-                  {quote && !quoting && (
-                    <div className="rounded-md bg-canvas p-3">
-                      <PriceBreakdown quote={quote} />
-                    </div>
-                  )}
-
-                  {bookingError && <p className="text-xs text-danger-fg">{bookingError}</p>}
-
-                  {loggedIn ? (
-                    <>
-                      <button
-                        type="submit"
-                        disabled={bookingLoading || !paymentsReady || !range?.endDate}
-                        className="btn-primary btn-lg w-full"
-                      >
-                        {bookingLoading
-                          ? 'Réservation…'
-                          : !paymentsReady
-                            ? 'Indisponible'
-                            : quote
-                              ? `Réserver · ${eur(quote.totalAmount)}`
-                              : 'Réserver'}
-                      </button>
-                      <p className="text-center text-[11px] text-muted">
-                        Vous ne serez débité qu&apos;après confirmation.
-                      </p>
-                    </>
-                  ) : (
-                    <div className="rounded-md border border-brand/25 bg-brand-tint/40 p-3.5 text-center">
-                      <p className="text-sm font-semibold text-ink">Connectez-vous pour réserver</p>
-                      <p className="mt-1 text-xs text-muted">
-                        Créez un compte ou connectez-vous pour finaliser cette réservation et
-                        contacter l&apos;hôte. Vos dates et informations restent enregistrées ici.
-                      </p>
-                      <div className="mt-3 flex gap-2">
-                        <Link
-                          href={loginHref(pathname)}
-                          onClick={saveDraft}
-                          className="btn-primary flex-1 justify-center"
-                        >
-                          Se connecter
-                        </Link>
-                        <Link
-                          href={registerHref(pathname)}
-                          onClick={saveDraft}
-                          className="btn-ghost flex-1 justify-center"
-                        >
-                          Créer un compte
-                        </Link>
-                      </div>
-                    </div>
-                  )}
-                </form>
-
-                {loggedIn && (
-                  <button onClick={handleContact} className="btn-ghost w-full">
-                    Contacter l&apos;hôte
-                  </button>
-                )}
+                <Link
+                  href={paymentsReady ? `/listings/${listing.id}/reserve` : '#'}
+                  aria-disabled={!paymentsReady}
+                  className={`btn-primary btn-lg w-full ${!paymentsReady ? 'pointer-events-none opacity-50' : ''}`}
+                >
+                  {paymentsReady ? reserveLabel : 'Indisponible'}
+                </Link>
+                <p className="text-center text-[11px] text-muted">
+                  La messagerie avec l&apos;hôte s&apos;active après le paiement de votre réservation.
+                </p>
               </>
             )}
           </div>
@@ -587,12 +487,12 @@ export default function ListingPage() {
             <span className="font-extrabold">{eurRound(listing.basePrice)}</span>
             <span className="text-muted"> / {unit}</span>
           </div>
-          <a
-            href="#booking"
+          <Link
+            href={paymentsReady ? `/listings/${listing.id}/reserve` : '#'}
             className={`btn-primary ${!paymentsReady ? 'pointer-events-none opacity-50' : ''}`}
           >
-            {paymentsReady ? 'Réserver' : 'Indisponible'}
-          </a>
+            {paymentsReady ? reserveLabel : 'Indisponible'}
+          </Link>
         </div>
       )}
 
@@ -623,9 +523,9 @@ export default function ListingPage() {
 function ListingSkeleton() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <Skeleton className="h-4 w-16" />
+      <Skeleton className="h-4 w-40" />
+      <Skeleton className="aspect-[16/8] w-full rounded-lg" />
       <Skeleton className="h-8 w-2/3" />
-      <Skeleton className="aspect-[2/1] w-full rounded-lg" />
       <div className="grid gap-8 md:grid-cols-[1fr_360px]">
         <div className="space-y-4">
           <Skeleton className="h-20 w-full" />

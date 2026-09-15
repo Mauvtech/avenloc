@@ -4,12 +4,17 @@ import type {
   Listing,
   ListingPhoto,
   ListingAvailability,
+  ListingAvailabilityRule,
+  Slot,
+  ManagedSlot,
   Booking,
   Conversation,
   Message,
   Review,
   ReviewList,
   SearchResult,
+  SearchFacets,
+  PendingReview,
   Quote,
   Deposit,
   RegisterData,
@@ -130,10 +135,18 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    // Création par un commercial (ou par l'hôte via le même wizard) pour le
+    // compte d'un hôte identifié par email — voir ListingsService.createForHost.
+    createCommercial: (data: unknown) =>
+      apiFetch<{ listing: Listing; isNewHost: boolean; devActivationUrl: string | null }>(
+        '/listings/commercial',
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
     getById: (id: string) => apiFetch<Listing>(`/listings/${id}`),
     update: (id: string, data: Record<string, unknown>) =>
       apiFetch<Listing>(`/listings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     search: (params: string) => apiFetch<SearchResult>(`/search?${params}`),
+    facets: () => apiFetch<SearchFacets>('/search/facets'),
     mine: () => apiFetch<Listing[]>('/listings/me'),
     setStatus: (id: string, status: 'DRAFT' | 'PUBLISHED') =>
       apiFetch<Listing>(`/listings/${id}/status`, {
@@ -165,6 +178,23 @@ export const api = {
       }),
     unblock: (id: string, availId: string) =>
       apiFetch<void>(`/listings/${id}/availability/${availId}`, { method: 'DELETE' }),
+    // Créneaux horaires (pricingUnit = HOUR)
+    availabilityRules: (id: string) =>
+      apiFetch<ListingAvailabilityRule[]>(`/listings/${id}/availability-rules`),
+    addAvailabilityRule: (
+      id: string,
+      data: { dayOfWeek: number; startTime: string; endTime: string; minDurationMinutes?: number; minLeadTimeMinutes?: number },
+    ) =>
+      apiFetch<ListingAvailabilityRule>(`/listings/${id}/availability-rules`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    deleteAvailabilityRule: (id: string, ruleId: string) =>
+      apiFetch<void>(`/listings/${id}/availability-rules/${ruleId}`, { method: 'DELETE' }),
+    slots: (id: string, date: string) =>
+      apiFetch<Slot[]>(`/listings/${id}/slots?date=${date}`),
+    slotsForManagement: (id: string, date: string) =>
+      apiFetch<ManagedSlot[]>(`/listings/${id}/slots/manage?date=${date}`),
   },
   bookings: {
     create: (data: unknown) =>
@@ -182,8 +212,15 @@ export const api = {
       ),
     approve: (id: string) =>
       apiFetch<Booking>(`/bookings/${id}/approve`, { method: 'POST' }),
-    reject: (id: string) =>
-      apiFetch<Booking>(`/bookings/${id}/reject`, { method: 'POST' }),
+    reject: (id: string, reason: string) =>
+      apiFetch<Booking>(`/bookings/${id}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
+    checkIn: (id: string) =>
+      apiFetch<Booking>(`/bookings/${id}/check-in`, { method: 'POST' }),
+    checkOut: (id: string) =>
+      apiFetch<Booking>(`/bookings/${id}/check-out`, { method: 'POST' }),
     complete: (id: string) =>
       apiFetch<Booking>(`/bookings/${id}/complete`, { method: 'POST' }),
     cancel: (id: string) =>
@@ -239,7 +276,7 @@ export const api = {
       }),
     byListing: (id: string) =>
       apiFetch<ReviewList>(`/listings/${id}/reviews`),
-    pending: () => apiFetch<Booking[]>('/reviews/pending'),
+    pending: () => apiFetch<PendingReview[]>('/reviews/pending'),
   },
   users: {
     publicProfile: (id: string) =>

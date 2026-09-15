@@ -19,6 +19,11 @@ import type { GoogleProfile } from './strategies/google.strategy';
 
 const EXCHANGE_CODE_TTL_SECONDS = 60;
 const RESET_TOKEN_TTL_SECONDS = 15 * 60;
+// Lien d'activation envoyé à un hôte invité par un commercial (voir
+// ListingsService.createForHost) — durée de vie plus longue qu'un simple
+// reset de mot de passe : l'hôte ne consulte pas forcément son email tout de
+// suite après le passage du commercial.
+const INVITE_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 const BCRYPT_ROUNDS = 12;
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60; // 15 min
@@ -124,16 +129,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) return {};
 
-    const token = randomBytes(32).toString('hex');
-    await this.redis.set(
-      `auth:reset:${this.hashToken(token)}`,
-      user.id,
-      RESET_TOKEN_TTL_SECONDS,
-    );
-
-    const frontendUrl =
-      this.config.get<string>('frontend.url') ?? 'http://localhost:3000';
-    const url = `${frontendUrl}/auth/reset?token=${token}`;
+    const url = await this.issueResetLink(user.id, 'reset', RESET_TOKEN_TTL_SECONDS);
     this.logger.log(`Lien de réinitialisation pour ${email} : ${url}`);
 
     return this.config.get<string>('nodeEnv') === 'production'
@@ -141,9 +137,39 @@ export class AuthService {
       : { devResetUrl: url };
   }
 
+  /**
+   * Invite un hôte créé par un commercial (voir ListingsService.createForHost)
+   * à activer son compte. Réutilise l'écran /auth/reset, mais avec une durée de
+   * vie plus longue qu'un reset de mot de passe classique — voir
+   * INVITE_TOKEN_TTL_SECONDS.
+   */
+  async inviteHost(userId: string, email: string): Promise<{ devActivationUrl?: string }> {
+    const url = await this.issueResetLink(userId, 'invite', INVITE_TOKEN_TTL_SECONDS);
+    this.logger.log(`Lien d'activation pour ${email} : ${url}`);
+
+    return this.config.get<string>('nodeEnv') === 'production'
+      ? {}
+      : { devActivationUrl: url };
+  }
+
+  private async issueResetLink(
+    userId: string,
+    kind: 'reset' | 'invite',
+    ttlSeconds: number,
+  ): Promise<string> {
+    const token = randomBytes(32).toString('hex');
+    await this.redis.set(`auth:${kind}:${this.hashToken(token)}`, userId, ttlSeconds);
+
+    const frontendUrl =
+      this.config.get<string>('frontend.url') ?? 'http://localhost:3000';
+    return `${frontendUrl}/auth/reset?token=${token}`;
+  }
+
   async resetPassword(token: string, newPassword: string): Promise<void> {
-    const key = `auth:reset:${this.hashToken(token)}`;
-    const userId = await this.redis.get<string>(key);
+    const hashed = this.hashToken(token);
+    const resetKey = `auth:reset:${hashed}`;
+    const inviteKey = `auth:invite:${hashed}`;
+    const userId = (await this.redis.get<string>(resetKey)) ?? (await this.redis.get<string>(inviteKey));
     if (!userId) {
       throw new UnauthorizedException('Lien invalide ou expiré');
     }
@@ -159,7 +185,8 @@ export class AuthService {
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
-    await this.redis.del(key);
+    await this.redis.del(resetKey);
+    await this.redis.del(inviteKey);
   }
 
   async handleGoogleLogin(profile: GoogleProfile): Promise<TokenResponseDto> {

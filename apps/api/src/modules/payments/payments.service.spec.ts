@@ -24,6 +24,9 @@ function makeStripeMock() {
     transfers: {
       create: jest.fn(),
     },
+    refunds: {
+      create: jest.fn(),
+    },
     customers: {
       create: jest.fn(),
     },
@@ -94,10 +97,12 @@ describe('PaymentsService', () => {
   let service: PaymentsService;
   let prisma: ReturnType<typeof buildPrismaMock>;
   let stripeMock: ReturnType<typeof makeStripeMock>;
+  let featuresService: { isOn: jest.Mock };
 
   beforeEach(async () => {
     prisma = buildPrismaMock();
     stripeMock = makeStripeMock();
+    featuresService = { isOn: jest.fn().mockReturnValue(false) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -117,7 +122,7 @@ describe('PaymentsService', () => {
         },
         {
           provide: FeaturesService,
-          useValue: { isOn: jest.fn().mockReturnValue(false), all: jest.fn(), set: jest.fn() },
+          useValue: featuresService,
         },
         {
           provide: MessagingService,
@@ -256,6 +261,83 @@ describe('PaymentsService', () => {
       await expect(
         service.capturePaymentIntent('unknown-booking'),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('refundForCancellation', () => {
+    const CAPTURED_PAYMENT = {
+      id: 'payment-id',
+      bookingId: 'booking-id',
+      status: PaymentStatus.CAPTURED,
+      amount: '100.00',
+      stripePaymentIntentId: 'pi_test',
+    };
+
+    it('ne fait rien si le taux est 0', async () => {
+      await service.refundForCancellation('booking-id', 0);
+      expect(prisma.payment.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('ne fait rien si aucun paiement capturé n\'existe', async () => {
+      prisma.payment.findUnique.mockResolvedValue(null);
+      await service.refundForCancellation('booking-id', 1);
+      expect(stripeMock.refunds.create).not.toHaveBeenCalled();
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+    });
+
+    it('ne fait rien si le paiement n\'est pas encore capturé (PENDING)', async () => {
+      prisma.payment.findUnique.mockResolvedValue({ ...CAPTURED_PAYMENT, status: PaymentStatus.PENDING });
+      await service.refundForCancellation('booking-id', 1);
+      expect(stripeMock.refunds.create).not.toHaveBeenCalled();
+    });
+
+    it('rembourse intégralement via Stripe et marque REFUNDED (taux 100%)', async () => {
+      prisma.payment.findUnique.mockResolvedValue(CAPTURED_PAYMENT);
+      stripeMock.refunds.create.mockResolvedValue({ id: 're_test' });
+
+      await service.refundForCancellation('booking-id', 1);
+
+      expect(stripeMock.refunds.create).toHaveBeenCalledWith({
+        payment_intent: 'pi_test',
+        amount: 10000,
+      });
+      expect(prisma.payment.update).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        data: expect.objectContaining({
+          refundedAmount: 100,
+          status: PaymentStatus.REFUNDED,
+          stripeRefundId: 're_test',
+        }),
+      });
+    });
+
+    it('rembourse partiellement et marque PARTIALLY_REFUNDED (taux 50%)', async () => {
+      prisma.payment.findUnique.mockResolvedValue(CAPTURED_PAYMENT);
+      stripeMock.refunds.create.mockResolvedValue({ id: 're_test' });
+
+      await service.refundForCancellation('booking-id', 0.5);
+
+      expect(stripeMock.refunds.create).toHaveBeenCalledWith({
+        payment_intent: 'pi_test',
+        amount: 5000,
+      });
+      expect(prisma.payment.update).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        data: expect.objectContaining({ refundedAmount: 50, status: PaymentStatus.PARTIALLY_REFUNDED }),
+      });
+    });
+
+    it('en mode simulate, met à jour le paiement sans appeler Stripe', async () => {
+      featuresService.isOn.mockReturnValue(true);
+      prisma.payment.findUnique.mockResolvedValue(CAPTURED_PAYMENT);
+
+      await service.refundForCancellation('booking-id', 1);
+
+      expect(stripeMock.refunds.create).not.toHaveBeenCalled();
+      expect(prisma.payment.update).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        data: expect.objectContaining({ refundedAmount: 100, status: PaymentStatus.REFUNDED }),
+      });
     });
   });
 });

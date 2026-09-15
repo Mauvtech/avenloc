@@ -4,6 +4,8 @@ import {
   IsString,
   IsEnum,
   IsDateString,
+  IsBoolean,
+  MaxLength,
   Min,
   Max,
   IsInt,
@@ -12,6 +14,13 @@ import { Type, Transform } from 'class-transformer';
 import { ListingType } from '@prisma/client';
 
 export class SearchQueryDto {
+  // Texte libre (nom d'annonce, ville, adresse) — complète la recherche géo
+  // plutôt que de la remplacer : les deux clauses s'appliquent en ET si présentes.
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  q?: string;
+
   // Optionnels : sans coordonnées, la recherche renvoie toutes les annonces
   // publiées (page d'accueil), triées par date.
   @IsOptional()
@@ -57,6 +66,11 @@ export class SearchQueryDto {
   @IsOptional()
   @IsString()
   amenities?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  instantBook?: boolean;
 
   @IsOptional()
   @IsDateString()

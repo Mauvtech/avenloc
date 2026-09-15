@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { loginHref, safeNext, saveTokens } from '@/lib/auth';
+import { Logo } from '@/components/nav';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 
 type Role = 'TENANT' | 'HOST';
 
@@ -18,7 +21,7 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get('next'));
   const [role, setRole] = useState<Role>(searchParams.get('role') === 'host' ? 'HOST' : 'TENANT');
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '' });
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', confirm: '' });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -28,10 +31,15 @@ function RegisterForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (form.password !== form.confirm) {
+      setError('Les mots de passe ne correspondent pas.');
+      return;
+    }
     setError(null);
     setLoading(true);
     try {
-      const tokens = await api.auth.register({ ...form, role });
+      const { confirm: _confirm, ...payload } = form;
+      const tokens = await api.auth.register({ ...payload, role });
       saveTokens(tokens.accessToken, tokens.refreshToken);
       router.push(next ?? (role === 'HOST' ? '/host' : '/'));
       router.refresh();
@@ -46,11 +54,8 @@ function RegisterForm() {
 
   return (
     <div className="mx-auto max-w-sm py-6">
-      <div className="mb-7 flex items-center justify-center gap-2.5">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-[15px] font-extrabold text-white">
-          A
-        </span>
-        <span className="text-lg font-bold">Aven</span>
+      <div className="mb-7 flex items-center justify-center">
+        <Logo />
       </div>
 
       {next && (
@@ -68,6 +73,15 @@ function RegisterForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 p-6">
+          <a href={`${API_URL}/auth/google`} className="btn-ghost w-full">
+            Continuer avec Google
+          </a>
+          <div className="flex items-center gap-3 text-xs text-muted">
+            <span className="h-px flex-1 bg-line" />
+            ou
+            <span className="h-px flex-1 bg-line" />
+          </div>
+
           {/* Choix du type de compte */}
           <div className="space-y-2">
             {ROLE_OPTIONS.map((opt) => {
@@ -121,6 +135,17 @@ function RegisterForm() {
               minLength={8}
               value={form.password}
               onChange={set('password')}
+              className="field"
+            />
+          </div>
+          <div>
+            <label className="label">Confirmer le mot de passe</label>
+            <input
+              type="password"
+              required
+              minLength={8}
+              value={form.confirm}
+              onChange={set('confirm')}
               className="field"
             />
           </div>

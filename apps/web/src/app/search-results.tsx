@@ -32,9 +32,16 @@ const Grid = ({ children }: { children: React.ReactNode }) => (
 );
 
 export default async function SearchResults({ searchParams }: Props) {
-  const isSearch = ['lat', 'type', 'q', 'minPrice', 'maxPrice', 'maxGuests', 'amenities'].some(
-    (k) => k in searchParams,
-  );
+  const isSearch = [
+    'lat',
+    'type',
+    'q',
+    'minPrice',
+    'maxPrice',
+    'maxGuests',
+    'amenities',
+    'instantBook',
+  ].some((k) => k in searchParams);
 
   let result: SearchResult;
   try {

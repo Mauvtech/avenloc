@@ -493,6 +493,47 @@ export class PaymentsService {
     await this.deposits.authorizeForBooking(bookingId).catch(() => undefined);
   }
 
+  // ── Remboursement (annulation) ───────────────────────────────────────────────
+
+  /**
+   * Rembourse tout ou partie d'un paiement déjà capturé, selon le taux calculé
+   * par BookingsService.cancel() à partir de la politique d'annulation. Ne fait
+   * rien si aucun paiement n'a encore été capturé (annulation avant paiement) ou
+   * si le taux est nul (aucun remboursement dû).
+   */
+  async refundForCancellation(bookingId: string, rate: number): Promise<void> {
+    if (rate <= 0) return;
+
+    const payment = await this.prisma.payment.findUnique({ where: { bookingId } });
+    if (!payment || payment.status !== PaymentStatus.CAPTURED) return;
+
+    const refundAmount = Math.min(
+      Number(payment.amount),
+      Math.round(Number(payment.amount) * rate * 100) / 100,
+    );
+    if (refundAmount <= 0) return;
+
+    let stripeRefundId: string | null = null;
+    if (!this.simulate && payment.stripePaymentIntentId) {
+      const refund = await this.stripe.refunds.create({
+        payment_intent: payment.stripePaymentIntentId,
+        amount: toStripeAmount(refundAmount),
+      });
+      stripeRefundId = refund.id;
+    }
+
+    const isFullRefund = refundAmount >= Number(payment.amount);
+    await this.prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        refundedAmount: refundAmount,
+        status: isFullRefund ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED,
+        refundedAt: new Date(),
+        ...(stripeRefundId && { stripeRefundId }),
+      },
+    });
+  }
+
   // ── Stripe webhook handlers ──────────────────────────────────────────────────
 
   constructWebhookEvent(rawBody: Buffer, signature: string): Stripe.Event {

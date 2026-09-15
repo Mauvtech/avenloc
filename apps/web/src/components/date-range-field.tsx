@@ -9,10 +9,21 @@ interface Props {
   startDate: string;
   endDate: string;
   onChange: (range: { startDate: string; endDate: string }) => void;
+  /** Intègre le champ sans son propre encadré (ex. segment d'une barre composite). */
+  bare?: boolean;
+  label?: string;
+  placeholder?: string;
 }
 
 // Sélecteur de plage de dates sans contrainte de disponibilité (page d'accueil).
-export default function DateRangeField({ startDate, endDate, onChange }: Props) {
+export default function DateRangeField({
+  startDate,
+  endDate,
+  onChange,
+  bare = false,
+  label,
+  placeholder = 'Dates (option.)',
+}: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -36,22 +47,23 @@ export default function DateRangeField({ startDate, endDate, onChange }: Props) 
     }
   }
 
-  const label =
+  const valueLabel =
     startDate && endDate
       ? `${dateShort(startDate)} → ${dateShort(endDate)}`
       : startDate
         ? `${dateShort(startDate)} → …`
-        : 'Dates (option.)';
+        : placeholder;
 
   return (
     <div ref={ref} className="relative">
-      <div className="field flex items-center justify-between p-0">
+      <div className={bare ? 'flex items-center justify-between' : 'field flex items-center justify-between p-0'}>
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex-1 px-3 py-2.5 text-left"
+          className={bare ? 'flex-1 text-left' : 'flex-1 px-3 py-2.5 text-left'}
         >
-          <span className={startDate ? 'text-ink' : 'text-muted/70'}>{label}</span>
+          {label && <div className="text-[11px] font-medium text-muted">{label}</div>}
+          <span className={startDate ? 'text-ink' : 'text-muted/70'}>{valueLabel}</span>
         </button>
         {startDate && (
           <button

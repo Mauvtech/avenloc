@@ -11,6 +11,8 @@ interface Props {
   /** "city" restreint aux communes, "address" cherche jusqu'au numéro. */
   kind?: 'address' | 'city';
   className?: string;
+  /** Remplace la classe par défaut de l'input (ex. intégration dans une barre composite). */
+  inputClassName?: string;
 }
 
 export default function AddressAutocomplete({
@@ -20,6 +22,7 @@ export default function AddressAutocomplete({
   placeholder,
   kind = 'address',
   className,
+  inputClassName,
 }: Props) {
   const [results, setResults] = useState<GeoResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -73,7 +76,7 @@ export default function AddressAutocomplete({
     <div ref={boxRef} className={`relative ${className ?? ''}`}>
       <input
         type="text"
-        className="field"
+        className={inputClassName ?? 'field'}
         autoComplete="off"
         placeholder={placeholder ?? 'Commencez à taper une adresse…'}
         value={value}

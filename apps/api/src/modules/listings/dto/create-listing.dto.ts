@@ -14,6 +14,7 @@ import {
   Min,
   Max,
   ArrayMaxSize,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
@@ -21,10 +22,11 @@ import {
   PricingUnit,
   CancellationPolicy,
 } from '@prisma/client';
+import { CreateAvailabilityRuleDto } from './availability-rule.dto';
 
 export class CreateListingDto {
   @IsEnum(ListingType)
-  type: ListingType = ListingType.APARTMENT;
+  type: ListingType = ListingType.MEETING_ROOM;
 
   @IsString()
   @MinLength(5)
@@ -106,6 +108,25 @@ export class CreateListingDto {
   @IsBoolean()
   instantBookEnabled: boolean = false;
 
+  // Assurance RC Pro exigée pour réserver — voir Booking.rcProConfirmed.
+  @IsOptional()
+  @IsBoolean()
+  rcProRequired?: boolean = false;
+
+  // Règlement intérieur affiché sur la fiche, à accepter obligatoirement à la réservation.
+  @IsOptional()
+  @IsString()
+  @MaxLength(3000)
+  houseRules?: string;
+
+  // FAQ — liste de { question, reponse }. Validée en objet libre côté DTO (souplesse
+  // du wizard commercial qui peut envoyer 0 à N entrées) ; la structure est documentée
+  // dans schema.prisma plutôt qu'imposée ici par une classe dédiée.
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  faq?: { question: string; reponse: string }[];
+
   @IsArray()
   @IsString({ each: true })
   @ArrayMaxSize(30)
@@ -114,4 +135,15 @@ export class CreateListingDto {
   @IsOptional()
   @IsObject()
   specificAttributes?: Record<string, unknown>;
+
+  // Créneaux horaires hebdomadaires initiaux (pricingUnit = HOUR uniquement) —
+  // créés dans la même opération que l'annonce. Évite un aller-retour séparé
+  // (authentifié, gated sur la propriété) qui échouerait pour une création par
+  // un commercial : l'hôte cible n'est pas l'utilisateur courant à ce moment-là.
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(14)
+  @ValidateNested({ each: true })
+  @Type(() => CreateAvailabilityRuleDto)
+  availabilityRules?: CreateAvailabilityRuleDto[];
 }

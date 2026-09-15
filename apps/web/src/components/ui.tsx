@@ -1,6 +1,25 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+/* ── Badge identité vérifiée ─────────────────────────────────────────── */
+export function VerifiedBadge({ className = '' }: { className?: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium text-ink ${className}`}>
+      <svg width="12" height="12" viewBox="0 0 10 10" fill="none" aria-hidden>
+        <circle cx="5" cy="5" r="5" className="fill-brand" />
+        <path
+          d="M2.8 5.1L4.2 6.5L7.2 3.3"
+          stroke="white"
+          strokeWidth="1.1"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      Vérifié
+    </span>
+  );
+}
+
 /* ── Skeleton ────────────────────────────────────────────────────────── */
 export function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`skeleton ${className}`} />;
@@ -77,6 +96,47 @@ export function BackLink({ href, children }: { href: string; children: ReactNode
       <span aria-hidden>←</span>
       {children}
     </Link>
+  );
+}
+
+/* ── Interrupteur (pilule) ───────────────────────────────────────────── */
+export function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative h-[22px] w-[38px] flex-none rounded-full transition-colors ${
+        checked ? 'bg-ink' : 'bg-line'
+      }`}
+    >
+      <span
+        className={`absolute top-0.5 h-[18px] w-[18px] rounded-full bg-white transition-all ${
+          checked ? 'left-[18px]' : 'left-0.5'
+        }`}
+      />
+    </button>
+  );
+}
+
+/* ── Fil d'Ariane ────────────────────────────────────────────────────── */
+export function Breadcrumbs({ items }: { items: { label: string; href?: string }[] }) {
+  return (
+    <nav className="flex flex-wrap items-center gap-1.5 text-sm text-muted">
+      {items.map((item, i) => (
+        <span key={i} className="flex items-center gap-1.5">
+          {i > 0 && <span aria-hidden>/</span>}
+          {item.href ? (
+            <Link href={item.href} className="transition-colors hover:text-ink hover:underline">
+              {item.label}
+            </Link>
+          ) : (
+            <span className="text-ink">{item.label}</span>
+          )}
+        </span>
+      ))}
+    </nav>
   );
 }
 

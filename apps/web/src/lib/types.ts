@@ -34,6 +34,32 @@ export interface ListingAvailability {
   isAvailable: boolean;
 }
 
+// Règle de créneaux hebdomadaire (annonces pricingUnit = HOUR).
+export interface ListingAvailabilityRule {
+  id: string;
+  listingId: string;
+  dayOfWeek: number; // 0 = dimanche ... 6 = samedi
+  startTime: string; // "08:00"
+  endTime: string; // "19:00"
+  minDurationMinutes: number;
+  minLeadTimeMinutes: number;
+}
+
+// Créneau horaire disponible, calculé côté API (GET /listings/:id/slots).
+export interface Slot {
+  start: string; // ISO datetime
+  end: string; // ISO datetime, exclusif
+}
+
+// Vue hôte d'un créneau (GET /listings/:id/slots/manage) — tous les créneaux
+// du jour, avec statut, pour le calendrier de blocage.
+export interface ManagedSlot {
+  start: string;
+  end: string;
+  status: 'available' | 'booked' | 'blocked';
+  availabilityId: string | null;
+}
+
 export interface Listing {
   id: string;
   hostId: string;
@@ -55,6 +81,15 @@ export interface Listing {
   depositAmount: string | null;
   cancellationPolicy: string;
   instantBookEnabled: boolean;
+  createdByCommercial: boolean;
+  accessMethod: string;
+  accessCode: string | null;
+  wifiName: string | null;
+  wifiPassword: string | null;
+  contactPhone: string | null;
+  rcProRequired: boolean;
+  houseRules: string | null;
+  faq: { question: string; reponse: string }[] | null;
   amenities: string[];
   specificAttributes: Record<string, unknown> | null;
   photos: ListingPhoto[];
@@ -66,6 +101,7 @@ export interface Listing {
     avatarUrl: string | null;
     bio: string | null;
     createdAt: string | null;
+    verified: boolean;
   } | null;
   createdAt: string;
 }
@@ -86,7 +122,14 @@ export interface Booking {
   guestCount: number;
   guestNote: string | null;
   arrivalTime: string | null;
+  activityDescription: string | null;
+  rcProConfirmed: boolean;
+  houseRulesAccepted: boolean;
+  checkedInAt: string | null;
+  checkedOutAt: string | null;
+  rejectionReason: string | null;
   hostApprovalDeadline: string | null;
+  hostApprovedAt: string | null;
   listing?: Partial<Listing> & Pick<Listing, 'title' | 'city' | 'type'>;
   tenant?: { firstName: string; lastName: string; avatarUrl: string | null };
   payment?: Payment | null;
@@ -171,6 +214,7 @@ export interface SearchResultItem {
   coverPhotoUrl: string | null;
   rating: number | null;
   reviewCount: number;
+  hostVerified: boolean;
 }
 
 export interface Quote {
@@ -215,6 +259,17 @@ export interface SearchResult {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface SearchFacets {
+  types: string[];
+  amenities: string[];
+  maxPrice: number;
+}
+
+export interface PendingReview {
+  bookingId: string;
+  possibleTargets: ('LISTING' | 'TENANT')[];
 }
 
 export interface RegisterData {

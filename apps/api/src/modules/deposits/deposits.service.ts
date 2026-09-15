@@ -308,6 +308,13 @@ export class DepositsService {
     });
   }
 
+  /** Libère l'empreinte non réclamée d'une réservation annulée (voir BookingsService.cancel). */
+  async releaseForCancellation(bookingId: string): Promise<void> {
+    const deposit = await this.prisma.deposit.findUnique({ where: { bookingId } });
+    if (!deposit) return;
+    await this.release(deposit.id);
+  }
+
   private async release(depositId: string): Promise<void> {
     const deposit = await this.prisma.deposit.findUnique({ where: { id: depositId } });
     if (!deposit || deposit.status !== 'AUTHORIZED') return;
