@@ -15,6 +15,7 @@ import { useCommercialGuard } from '../use-commercial-guard';
 
 export default function NewCommercialLeadPage() {
   const { ready } = useCommercialGuard();
+  const [step, setStep] = useState(0);
   const router = useRouter();
   const toast = useToast();
 
@@ -101,6 +102,15 @@ export default function NewCommercialLeadPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (step < 2) {
+      if (step === 0 && !establishmentId && (!establishment.name || !establishment.addressLine1 || !establishment.city)) {
+        setError("Sélectionnez une adresse pour l’établissement.");
+        return;
+      }
+      setError(null);
+      setStep(step + 1);
+      return;
+    }
     if (!host.email || !host.firstName || !host.lastName) {
       setError("Merci de renseigner l'identité de l'hôte.");
       return;
@@ -138,16 +148,16 @@ export default function NewCommercialLeadPage() {
   if (!ready) return null;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-[640px] space-y-6 px-0 py-2 min-[641px]:px-8">
       <BackLink href="/commercial">Retour</BackLink>
-      <h1 className="text-2xl font-extrabold">Nouvelle fiche</h1>
-      <p className="text-sm text-muted">
-        Créez le compte hôte, l&apos;établissement et l&apos;annonce en une fois — l&apos;hôte n&apos;a
-        plus qu&apos;à activer son compte pour reprendre la main.
-      </p>
-
+      <h1 className="text-[22px] font-bold">Créer une fiche pendant la visite</h1>
+      <p className="text-[13px] text-muted">Formulaire rapide — l’hôte n’aura plus qu’à valider avant publication.</p>
+      <div className="flex gap-1.5" aria-label={`Étape ${step + 1} sur 3`}>
+        {['Destinataire', 'Essentiel', 'Récapitulatif'].map((label,i) => <div key={label} title={label} className={`h-[3px] flex-1 rounded-sm ${i <= step ? 'bg-brand' : 'bg-line'}`} />)}
+      </div>
       <form onSubmit={handleSubmit} className="space-y-6">
-        <section className="card space-y-3 p-4">
+        <fieldset disabled={step !== 0} hidden={step !== 0} className="space-y-6">
+        <section className="space-y-4">
           <h2 className="section-title">Hôte</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -216,7 +226,7 @@ export default function NewCommercialLeadPage() {
         </section>
 
         {!establishmentId && (
-          <section className="card space-y-3 p-4">
+          <section className="space-y-4">
             <h2 className="section-title">Établissement</h2>
             <div>
               <label className="label">Nom de l&apos;établissement</label>
@@ -245,7 +255,9 @@ export default function NewCommercialLeadPage() {
           </section>
         )}
 
-        <section className="card space-y-3 p-4">
+        </fieldset>
+        <fieldset disabled={step !== 1} hidden={step !== 1}>
+        <section className="space-y-4">
           <h2 className="section-title">Espace</h2>
           <div>
             <span className="label">Type</span>
@@ -329,11 +341,16 @@ export default function NewCommercialLeadPage() {
           </div>
         </section>
 
-        {error && <p className="text-sm text-danger-fg">{error}</p>}
+        </fieldset>
+        {step === 2 && <section className="card divide-y divide-line px-5">
+          {[['Hôte', `${host.firstName} ${host.lastName}`], ['Email', host.email], ['Établissement', establishmentId ? existingEstablishments.find((e) => e.id === establishmentId)?.name : establishment.name], ['Espace', listing.title], ['Type', typeLabel(listing.type)], ['Prix', `${listing.basePrice} € / ${UNIT_LABEL_SHORT[listing.pricingUnit]}`]].map(([label, value]) => <div key={label} className="flex justify-between gap-4 py-3 text-sm"><span className="text-muted">{label}</span><span className="text-right">{value}</span></div>)}
+        </section>}
+        {error && <p role="alert" className="text-sm text-danger-fg">{error}</p>}
 
-        <button type="submit" disabled={loading} className="btn-primary btn-lg w-full">
-          {loading ? 'Envoi…' : "Créer la fiche & inviter l'hôte"}
-        </button>
+        <div className="flex justify-between gap-3">
+          <button type="button" disabled={step === 0 || loading} onClick={() => { setStep(step - 1); setError(null); }} className="btn-ghost">Précédent</button>
+          <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Envoi…' : step < 2 ? 'Suivant' : "Envoyer à l’hôte pour validation"}</button>
+        </div>
         <p className="text-center text-xs text-muted">
           L&apos;annonce est créée en attente de validation par l&apos;hôte. Aucun réseau ? La fiche
           est enregistrée localement et envoyée automatiquement au retour de la connexion.

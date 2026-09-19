@@ -28,7 +28,7 @@ interface Props {
 }
 
 const Grid = ({ children }: { children: React.ReactNode }) => (
-  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{children}</div>
+  <div className="marketplace-grid">{children}</div>
 );
 
 export default async function SearchResults({ searchParams }: Props) {
@@ -41,7 +41,7 @@ export default async function SearchResults({ searchParams }: Props) {
     result = await fetchResults(searchParams);
   } catch {
     return (
-      <div className="rounded-lg border border-danger/30 bg-danger-tint p-4 text-sm text-danger-fg">
+      <div className="mt-7 rounded-lg border border-danger/30 bg-danger-tint p-4 text-sm text-danger-fg">
         Impossible de charger les annonces pour le moment.
       </div>
     );
@@ -65,16 +65,11 @@ export default async function SearchResults({ searchParams }: Props) {
   const hasMore = shown >= currentLimit && shown < result.total;
 
   return (
-    <section className="space-y-4">
+    <section className="mt-7 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm font-semibold">
-          {isSearch
-            ? `${result.total} résultat${result.total > 1 ? 's' : ''}${place ? ` · ${place}` : ''}`
-            : 'Annonces récentes'}
-          <span className="font-normal text-muted">
-            {' '}
-            · {shown} affichée{shown > 1 ? 's' : ''}
-          </span>
+        <p className="text-[13px] text-muted">
+          {result.total} espace{result.total !== 1 ? 's' : ''} disponible{result.total !== 1 ? 's' : ''}
+          {place ? ` · ${place}` : ''}
         </p>
         <SortSelect />
       </div>
@@ -92,7 +87,7 @@ export default async function SearchResults({ searchParams }: Props) {
 
 SearchResults.Skeleton = function SearchResultsSkeleton() {
   return (
-    <section className="space-y-4">
+    <section className="mt-7 space-y-4">
       <div className="h-5 w-40 skeleton" />
       <Grid>
         {Array.from({ length: 8 }, (_, i) => (

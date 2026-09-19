@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { api, type ConnectStatus } from '@/lib/api';
 import { PageHeader, PageLoader } from '@/components/ui';
 import { computeHostStats, fmtEUR, fmtEUR2 } from '@/lib/host-stats';
 import { useHostGuard } from './use-host-guard';
-import type { Booking } from '@/lib/types';
+import type { Booking, Listing } from '@/lib/types';
 
 export default function HostDashboardPage() {
   const { ready } = useHostGuard();
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [spaces, setSpaces] = useState<Listing[]>([]);
   const [connect, setConnect] = useState<ConnectStatus | null>(null);
   const [connectChecked, setConnectChecked] = useState(false);
   const [onboarding, setOnboarding] = useState(false);
@@ -21,8 +23,10 @@ export default function HostDashboardPage() {
     Promise.all([
       api.bookings.asHost().catch(() => [] as Booking[]),
       api.payments.connectStatus().catch(() => null),
+      api.listings.mine().catch(() => [] as Listing[]),
     ])
-      .then(([bs, cs]) => {
+      .then(([bs, cs, ls]) => {
+        setSpaces(ls);
         setBookings(bs);
         setConnect(cs);
         setConnectChecked(true);
@@ -46,12 +50,41 @@ export default function HostDashboardPage() {
 
   if (!ready || loading) return <PageLoader />;
 
+  const now = new Date();
+  const today = bookings.filter((b) => b.status !== 'CANCELLED' && new Date(b.startAt).toDateString() === now.toDateString());
+  const occupied = new Set(bookings.filter((b) => b.status === 'CONFIRMED' && new Date(b.startAt) <= now && new Date(b.endAt) > now).map((b) => b.listingId)).size;
+  const nextArrival = today.filter((b) => b.status === 'CONFIRMED' && new Date(b.startAt) > now).sort((a,b) => a.startAt.localeCompare(b.startAt))[0];
+  const monthCount = bookings.filter((b) => b.status !== 'CANCELLED' && new Date(b.startAt).getMonth() === now.getMonth() && new Date(b.startAt).getFullYear() === now.getFullYear()).length;
+  const firstSpace = spaces.find((s) => s.status === 'PUBLISHED') ?? spaces[0];
   const active = connect?.connected && connect.status === 'active';
   const connectPending = connect?.connected && connect.status !== 'active';
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Tableau de bord" />
+      <PageHeader title="Bonjour 👋" />
+      <section>
+        <h2 className="section-title mb-3">Aujourd’hui</h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Kpi label="Réservations" value={String(today.length)} />
+          <Kpi label="Espaces occupés" value={`${occupied} / ${spaces.filter((s) => s.status === 'PUBLISHED').length}`} />
+          <Kpi label="Prochaine arrivée" value={nextArrival ? new Date(nextArrival.startAt).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : '—'} hint={nextArrival?.listing?.title} />
+        </div>
+      </section>
+      <section>
+        <h2 className="section-title mb-3">Ce mois-ci</h2>
+        <div className="grid grid-cols-2 gap-4"><Kpi label="Revenu net" value={fmtEUR(stats.revenueMonth)} /><Kpi label="Réservations" value={String(monthCount)} /></div>
+      </section>
+      <div className="grid gap-8 min-[901px]:grid-cols-2">
+        <section><h2 className="section-title mb-3">Actions</h2><div className="flex flex-wrap gap-3">
+          <Link className="btn-ghost text-[13px] font-normal" href={firstSpace ? `/listings/${firstSpace.id}/calendar` : '/host/spaces'}>Modifier disponibilité</Link>
+          <Link className="btn-ghost text-[13px] font-normal" href={firstSpace ? `/listings/${firstSpace.id}/edit` : '/host/spaces'}>Modifier prix</Link>
+          <Link className="btn-ghost text-[13px] font-normal" href="/host/spaces">Modifier un espace</Link>
+          <Link className="btn-ghost text-[13px] font-normal" href="/host/reservations">Voir les réservations</Link>
+        </div></section>
+        <section><h2 className="section-title mb-3">Réservations récentes</h2><div className="card divide-y divide-line">
+          {bookings.length ? [...bookings].sort((a,b) => b.createdAt.localeCompare(a.createdAt)).slice(0,4).map((b) => <Link key={b.id} href="/host/reservations" className="block px-4 py-3 hover:bg-canvas"><p className="text-[13px]">{b.listing?.title ?? 'Réservation'} — {fmtEUR(b.totalAmount)}</p><p className="mt-1 text-xs text-muted">{new Date(b.startAt).toLocaleDateString('fr-FR')}</p></Link>) : <p className="px-4 py-3 text-[13px] text-muted">Aucune réservation pour le moment.</p>}
+        </div></section>
+      </div>
 
       {/* Encaissements Stripe */}
       {connectChecked &&
@@ -119,7 +152,7 @@ export default function HostDashboardPage() {
 // Reprend StatCard du prototype : bordure fine, radius 12, aucune ombre ni accent coloré.
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-lg border border-line bg-surface p-4">
+    <div className="rounded-lg border border-line bg-surface p-[18px]">
       <div className="text-[13px] text-muted">{label}</div>
       <div className="mt-1.5 text-[22px] font-bold tracking-tight">{value}</div>
       {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}

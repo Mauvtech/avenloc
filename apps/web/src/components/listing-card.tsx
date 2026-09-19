@@ -31,7 +31,7 @@ export default function ListingCard({ listing }: { listing: SearchResultItem }) 
       </div>
       <p className="mt-0.5 text-[13px] text-muted">
         {typeLabel(listing.type)}
-        {listing.city && ` · ${listing.city}`}
+        {listing.maxGuests != null && ` · ${listing.maxGuests} pers.`}
       </p>
       <p className="mt-1.5 text-sm text-ink">
         <span className="font-semibold">{eurRound(listing.basePrice)}</span>

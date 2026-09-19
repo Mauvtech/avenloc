@@ -17,7 +17,7 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get('next'));
-  const [role, setRole] = useState<Role>(searchParams.get('role') === 'host' ? 'HOST' : 'TENANT');
+  const [role, setRole] = useState<Role>(searchParams.get('role') === 'host' || next?.startsWith('/host') ? 'HOST' : 'TENANT');
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '' });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -42,32 +42,16 @@ function RegisterForm() {
     }
   }
 
-  const tab = 'flex-1 px-4 py-3 text-center text-sm font-semibold transition-colors';
-
+  const roleLabel = next?.startsWith('/commercial') ? 'Espace commercial' : role === 'HOST' ? 'Espace hôte' : 'Espace client';
   return (
-    <div className="mx-auto max-w-sm py-6">
-      <div className="mb-7 flex items-center justify-center gap-2.5">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-[15px] font-extrabold text-white">
-          A
-        </span>
-        <span className="text-lg font-bold">Aven</span>
+    <div className="auth-reference">
+      <h1 className="mb-1.5 text-[22px] font-bold">{roleLabel}</h1>
+      <p className="mb-6 text-[13px] text-muted">Connectez-vous ou créez un compte pour accéder à cet espace.</p>
+      <div className="auth-tabs">
+        <Link href={loginHref(next)} className="auth-tab">Se connecter</Link>
+        <span className="auth-tab auth-tab-active">Créer un compte</span>
       </div>
-
-      {next && (
-        <p className="mb-4 rounded-md bg-brand-tint px-3 py-2 text-center text-sm text-brand-fg">
-          Créez votre compte pour continuer là où vous en étiez.
-        </p>
-      )}
-
-      <div className="card overflow-hidden">
-        <div className="flex border-b border-line">
-          <Link href={loginHref(next)} className={`${tab} bg-canvas text-muted hover:text-ink`}>
-            Connexion
-          </Link>
-          <span className={`${tab} bg-surface text-ink`}>Inscription</span>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4 p-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
           {/* Choix du type de compte */}
           <div className="space-y-2">
             {ROLE_OPTIONS.map((opt) => {
@@ -132,8 +116,7 @@ function RegisterForm() {
                 ? 'Créer mon compte hôte'
                 : 'Créer mon compte'}
           </button>
-        </form>
-      </div>
+      </form>
 
       <p className="mt-5 text-center text-sm text-muted">
         Déjà un compte ?{' '}

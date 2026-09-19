@@ -208,7 +208,7 @@ export default function ListingPage() {
     : null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 pb-20 md:pb-0">
+    <div className="space-y-5 pb-20 md:pb-0">
       <BackLink href="/">Retour aux annonces</BackLink>
 
       {isOwner && listing.status === 'PENDING_VALIDATION' && (
@@ -234,6 +234,26 @@ export default function ListingPage() {
         </div>
       )}
 
+      <div className="marketplace-detail">
+        {/* Colonne principale */}
+        <div className="space-y-7">
+      {/* Galerie */}
+      {photos.length === 0 && (
+        <div className="flex h-40 items-center justify-center gap-3 rounded-lg border border-dashed border-line bg-canvas text-sm text-muted sm:h-56">
+          <CategoryIcon type={listing.type} size={30} className="text-line" />
+          Aucune photo pour cette annonce
+        </div>
+      )}
+      {photos.length > 0 && (
+        <div>
+          <button onClick={() => setLightbox(photos[0].url)} className="block aspect-[16/8] w-full overflow-hidden rounded bg-canvas" aria-label="Agrandir la photo principale">
+            <img src={photos[0].url} alt={listing.title} className="h-full w-full object-cover" />
+          </button>
+          <div className="mt-2 grid grid-cols-2 gap-2 min-[641px]:grid-cols-4">
+            {photos.map((photo, i) => <button key={photo.id} onClick={() => setLightbox(photo.url)} aria-label={`Agrandir la photo ${i+1}`} className="aspect-[4/3] overflow-hidden rounded bg-canvas"><img src={photo.url} alt={`${listing.title}, vue ${i+1}`} className="h-full w-full object-cover" /></button>)}
+          </div>
+        </div>
+      )}
       {/* En-tête */}
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -251,7 +271,7 @@ export default function ListingPage() {
             </span>
           )}
         </div>
-        <h1 className="text-2xl font-extrabold leading-tight sm:text-3xl">{listing.title}</h1>
+        <h1 className="text-2xl font-bold leading-tight">{listing.title}</h1>
         <p className="text-sm text-muted">
           {rating !== null && (
             <span className="font-semibold text-ink">
@@ -264,52 +284,6 @@ export default function ListingPage() {
         </p>
       </div>
 
-      {/* Galerie */}
-      {photos.length === 0 && (
-        <div className="flex h-40 items-center justify-center gap-3 rounded-lg border border-dashed border-line bg-canvas text-sm text-muted sm:h-56">
-          <CategoryIcon type={listing.type} size={30} className="text-line" />
-          Aucune photo pour cette annonce
-        </div>
-      )}
-      {photos.length === 1 && (
-        <button
-          onClick={() => setLightbox(photos[0].url)}
-          className="group block aspect-[16/9] w-full overflow-hidden rounded-lg bg-canvas"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={photos[0].url}
-            alt={listing.title}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-          />
-        </button>
-      )}
-      {photos.length >= 2 && (
-        <div className="grid gap-2 overflow-hidden rounded-lg sm:aspect-[2.4/1] sm:grid-cols-4 sm:grid-rows-2">
-          {photos.slice(0, 5).map((p, i) => (
-            <button
-              key={p.id}
-              onClick={() => setLightbox(p.url)}
-              className={`group relative overflow-hidden bg-canvas ${
-                i === 0
-                  ? 'aspect-[16/10] sm:col-span-2 sm:row-span-2 sm:aspect-auto'
-                  : 'hidden aspect-[4/3] sm:block'
-              }`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={p.url}
-                alt={i === 0 ? listing.title : ''}
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-              />
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="grid gap-8 md:grid-cols-[1fr_360px]">
-        {/* Colonne principale */}
-        <div className="space-y-8">
           {/* Hôte */}
           {host && (
             <section className="flex items-center gap-4 border-b border-line pb-6">
@@ -489,7 +463,7 @@ export default function ListingPage() {
 
         {/* Colonne latérale */}
         <div>
-          <div className="card sticky top-20 space-y-4 p-4 shadow-raised">
+          <div className="card sticky top-5 space-y-4 p-[22px]">
             <div className="flex items-baseline justify-between">
               <div>
                 <span className="text-xl font-extrabold">{eurRound(listing.basePrice)}</span>

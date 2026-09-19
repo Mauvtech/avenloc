@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import CategoryIcon from '@/components/category-icon';
 import AddressAutocomplete from '@/components/address-autocomplete';
 import DateRangeField from '@/components/date-range-field';
 import { geocodeCity, type GeoResult } from '@/lib/geo';
@@ -39,7 +38,8 @@ export default function SearchForm() {
   const [amenities, setAmenities] = useState<string[]>(
     (params.get('amenities') ?? '').split(',').filter(Boolean),
   );
-  const [showFilters, setShowFilters] = useState(false);
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
+  const [instant, setInstant] = useState(params.get('instantBook') === 'true');
   const [submitting, setSubmitting] = useState(false);
 
   const activeFilters =
@@ -47,7 +47,7 @@ export default function SearchForm() {
     (maxGuests ? 1 : 0) +
     (minPrice ? 1 : 0) +
     (maxPrice ? 1 : 0) +
-    amenities.length;
+    amenities.length + (instant ? 1 : 0);
 
   const [locError, setLocError] = useState<string | null>(null);
 
@@ -71,6 +71,7 @@ export default function SearchForm() {
     if (minPrice) p.set('minPrice', minPrice);
     if (maxPrice) p.set('maxPrice', maxPrice);
     if (amenities.length) p.set('amenities', amenities.join(','));
+    if (instant) p.set('instantBook', 'true');
     const sort = params.get('sort');
     if (sort) p.set('sort', sort);
     return p.toString();
@@ -90,7 +91,7 @@ export default function SearchForm() {
     }, 350);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, minPrice, maxPrice, maxGuests, amenities.join(','), startDate, endDate]);
+  }, [type, minPrice, maxPrice, maxGuests, amenities.join(','), startDate, endDate, instant, radius]);
 
   // Renvoie des coords si un lieu est fourni, null si le champ est vide
   // (→ recherche « toutes villes »), ou `false` si le lieu est introuvable.
@@ -133,6 +134,7 @@ export default function SearchForm() {
       if (minPrice) p.set('minPrice', minPrice);
       if (maxPrice) p.set('maxPrice', maxPrice);
       if (amenities.length) p.set('amenities', amenities.join(','));
+    if (instant) p.set('instantBook', 'true');
       const sort = params.get('sort');
       if (sort) p.set('sort', sort);
       const qs = p.toString();
@@ -142,115 +144,58 @@ export default function SearchForm() {
     }
   }
 
+  function chip(key: string, label: string, active: boolean) {
+    return <button type="button" aria-expanded={openFilter === key} onClick={() => setOpenFilter(openFilter === key ? null : key)} className={`chip ${active || openFilter === key ? 'chip-active' : ''}`}>{label}</button>;
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="card overflow-hidden">
-      <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-[1.5fr_1.2fr_auto] sm:items-end">
-        <div>
-          <label className="label">Lieu</label>
-          <AddressAutocomplete
-            kind="city"
-            value={locationText}
-            onQueryChange={(t) => {
-              setLocationText(t);
-              setLocError(null);
-              if (picked) setPicked(null);
-            }}
+    <form onSubmit={handleSubmit} className="relative z-30">
+      <div className="marketplace-search">
+        <div className="marketplace-search-field">
+          <label className="label" htmlFor="search-location">Où</label>
+          <AddressAutocomplete id="search-location" kind="city" value={locationText}
+            onQueryChange={(t) => { setLocationText(t); setLocError(null); setPicked(null); }}
             onSelect={(r: GeoResult) => setPicked({ lat: r.latitude, lng: r.longitude })}
-            placeholder="Toute la France"
-          />
-          {locError && <p className="mt-1 text-xs text-danger-fg">{locError}</p>}
+            placeholder="" />
         </div>
-        <div>
-          <label className="label">Dates</label>
-          <DateRangeField
-            startDate={startDate}
-            endDate={endDate}
-            onChange={({ startDate: s, endDate: e }) => {
-              setStartDate(s);
-              setEndDate(e);
-            }}
-          />
+        <div className="marketplace-search-field">
+          <span className="label">Quand</span>
+          <DateRangeField startDate={startDate} endDate={endDate} onChange={({ startDate: s, endDate: e }) => { setStartDate(s); setEndDate(e); }} />
         </div>
-        <button type="submit" disabled={submitting} className="btn-primary sm:h-[42px]">
-          {submitting ? '…' : 'Rechercher'}
-        </button>
+        <div className="marketplace-search-field">
+          <label className="label" htmlFor="search-type">Type d’espace</label>
+          <select id="search-type" value={type} onChange={(e) => setType(e.target.value)} className="w-full bg-transparent text-sm outline-none">
+            <option value=""> </option>
+            {LISTING_TYPES.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
+          </select>
+        </div>
+        <button type="submit" disabled={submitting} className="marketplace-search-submit">{submitting ? 'Recherche…' : 'Rechercher'}</button>
       </div>
-
-      <div className="flex items-center justify-between border-t border-line px-3 py-2">
-        <button
-          type="button"
-          onClick={() => setShowFilters((s) => !s)}
-          className="text-sm font-semibold text-muted hover:text-ink"
-        >
-          {showFilters ? 'Masquer les filtres' : 'Filtres'}
-          {activeFilters > 0 && !showFilters && (
-            <span className="ml-1.5 rounded-full bg-brand px-1.5 text-[11px] font-bold text-white">
-              {activeFilters}
-            </span>
-          )}
-        </button>
-        <span className="text-xs text-muted">Rayon {radius} km</span>
+      {locError && <p role="alert" className="mt-2 text-sm text-danger-fg">{locError}</p>}
+      <div className="mt-5 flex flex-wrap gap-2">
+        {chip('capacity', maxGuests ? `${maxGuests}+ personnes` : 'Capacité', !!maxGuests)}
+        {chip('price', maxPrice ? `Jusqu’à ${maxPrice} €` : 'Prix', !!(maxPrice || minPrice))}
+        {chip('amenities', amenities.length ? `Équipements · ${amenities.length}` : 'Équipements', !!amenities.length)}
+        <button type="button" aria-pressed={instant} onClick={() => setInstant(!instant)} className={`chip ${instant ? 'chip-active' : ''}`}>Réservation instantanée</button>
+        {picked && chip('radius', `Rayon ${radius} km`, radius !== '25')}
+        {activeFilters > 0 && <button type="button" className="text-[13px] text-muted underline" onClick={() => { setType(''); setMaxGuests(''); setMinPrice(''); setMaxPrice(''); setAmenities([]); setInstant(false); setOpenFilter(null); }}>Réinitialiser</button>}
       </div>
-
-      {showFilters && (
-        <div className="space-y-4 border-t border-line bg-canvas p-3">
-          <div>
-            <label className="label">Type d&apos;espace</label>
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 no-scrollbar">
-              {LISTING_TYPES.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setType(type === t ? '' : t)}
-                  className={`chip ${type === t ? 'chip-active' : ''}`}
-                >
-                  <CategoryIcon type={t} size={15} />
-                  <span className="whitespace-nowrap">{typeLabel(t)}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div>
-              <label className="label">Locataires</label>
-              <input type="number" min="1" value={maxGuests} onChange={(e) => setMaxGuests(e.target.value)} className="field" />
-            </div>
-            <div>
-              <label className="label">Prix min (€)</label>
-              <input type="number" min="0" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} className="field" />
-            </div>
-            <div>
-              <label className="label">Prix max (€)</label>
-              <input type="number" min="0" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} className="field" />
-            </div>
-            <div>
-              <label className="label">Rayon (km)</label>
-              <input type="number" min="1" max="100" value={radius} onChange={(e) => setRadius(e.target.value)} className="field" />
-            </div>
-          </div>
-
-          <div>
-            <label className="label">Équipements</label>
-            <div className="flex flex-wrap gap-2">
-              {AMENITIES.map((a) => (
-                <button
-                  key={a}
-                  type="button"
-                  onClick={() =>
-                    setAmenities((cur) =>
-                      cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a],
-                    )
-                  }
-                  className={`chip capitalize ${amenities.includes(a) ? 'chip-active' : ''}`}
-                >
-                  {a}
-                </button>
-              ))}
-            </div>
-          </div>
+      {openFilter === 'capacity' && <div className="mt-3 flex flex-wrap gap-2">
+        {[1, 2, 4, 6, 10].map((n) => <button key={n} type="button" className={`chip ${maxGuests === String(n) ? 'chip-active' : ''}`} onClick={() => setMaxGuests(maxGuests === String(n) ? '' : String(n))}>{n}+ personnes</button>)}
+        <label className="flex items-center gap-2 text-[13px] text-muted">Autre <input aria-label="Capacité minimale" type="number" min="1" value={maxGuests} onChange={(e) => setMaxGuests(e.target.value)} className="field w-20" /></label>
+      </div>}
+      {openFilter === 'price' && <div className="mt-3 max-w-xs space-y-2 text-[13px]">
+        <label htmlFor="price-range">Jusqu’à <strong>{maxPrice || 500} €</strong></label>
+        <input id="price-range" type="range" min="10" max="500" step="5" value={maxPrice || '500'} onChange={(e) => setMaxPrice(e.target.value === '500' ? '' : e.target.value)} className="w-full accent-ink" />
+        <div className="grid grid-cols-2 gap-3">
+          <label>Prix min (€)<input type="number" min="0" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} className="field mt-1" /></label>
+          <label>Prix max (€)<input type="number" min="0" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} className="field mt-1" /></label>
         </div>
-      )}
+      </div>}
+      {openFilter === 'amenities' && <div className="mt-3 flex flex-wrap gap-2">
+        {AMENITIES.map((a) => <button key={a} type="button" aria-pressed={amenities.includes(a)} onClick={() => setAmenities((cur) => cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a])} className={`chip capitalize ${amenities.includes(a) ? 'chip-active' : ''}`}>{a === 'wifi' ? 'Wi-Fi' : a}</button>)}
+      </div>}
+      {openFilter === 'radius' && <label className="mt-3 block max-w-xs text-sm">Rayon de recherche (km)<input type="number" min="1" max="100" value={radius} onChange={(e) => setRadius(e.target.value)} className="field mt-1" /></label>}
     </form>
   );
 }

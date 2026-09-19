@@ -60,6 +60,10 @@ export class PostgisSearchAdapter implements SearchEnginePort {
       ? Prisma.sql`AND l.type = ${filters.type}::"ListingType"`
       : Prisma.empty;
 
+    const instantClause = filters.instantBook
+      ? Prisma.sql`AND l."instantBookEnabled" = true AND l."activityValidationRequired" = false`
+      : Prisma.empty;
+
     const minPriceClause =
       filters.minPrice !== undefined
         ? Prisma.sql`AND l."basePrice" >= ${filters.minPrice}`
@@ -143,6 +147,7 @@ export class PostgisSearchAdapter implements SearchEnginePort {
       WHERE l.status = 'PUBLISHED'
         ${geoClause}
         ${typeClause}
+        ${instantClause}
         ${minPriceClause}
         ${maxPriceClause}
         ${maxGuestsClause}
