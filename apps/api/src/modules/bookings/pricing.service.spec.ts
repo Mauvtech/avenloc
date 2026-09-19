@@ -10,6 +10,7 @@ function makeDecimal(n: string | number): Decimal {
 }
 
 const baseListing: Listing = {
+  verifiedAt: null,
   id: 'listing-1',
   hostId: 'host-1',
   type: 'APARTMENT',

@@ -230,6 +230,9 @@ model Listing {
   type   ListingType
   status ListingStatus @default(DRAFT)
 
+  // Date de vérification de cet espace par la plateforme ; indépendante du statut de publication et de l’identité de l’hôte.
+  verifiedAt  DateTime? @db.Timestamptz
+
   title       String
   description String
 

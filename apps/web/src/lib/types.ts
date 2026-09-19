@@ -51,6 +51,7 @@ export interface Slot {
 export type AccessMethod = 'CONNECTED_LOCK' | 'ACCESS_CODE' | 'KEY_BOX' | 'QR_CODE' | 'RECEPTION';
 
 export interface Listing {
+  verifiedAt?: string | null;
   id: string;
   hostId: string;
   type: string;
@@ -197,6 +198,7 @@ export interface ReviewList {
 }
 
 export interface SearchResultItem {
+  verifiedAt?: string | null;
   id: string;
   title: string;
   type: string;

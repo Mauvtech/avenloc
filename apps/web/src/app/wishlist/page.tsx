@@ -11,6 +11,7 @@ import type { Listing, SearchResultItem } from '@/lib/types';
 function toItem(l: Listing): SearchResultItem {
   return {
     id: l.id,
+    verifiedAt: l.verifiedAt,
     title: l.title,
     type: l.type,
     city: l.city,

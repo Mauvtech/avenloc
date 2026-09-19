@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
 import { isAuthenticated, loginHref, registerHref } from '@/lib/auth';
+import VerificationBadge from '@/components/verification-badge';
 import CategoryIcon from '@/components/category-icon';
 import SlotPicker, { type SlotSelection } from '@/components/slot-picker';
 import PriceBreakdown from '@/components/price-breakdown';
@@ -271,7 +272,10 @@ export default function ListingPage() {
             </span>
           )}
         </div>
-        <h1 className="text-2xl font-bold leading-tight">{listing.title}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold leading-tight">{listing.title}</h1>
+          <VerificationBadge verifiedAt={listing.verifiedAt} />
+        </div>
         <p className="text-sm text-muted">
           {rating !== null && (
             <span className="font-semibold text-ink">

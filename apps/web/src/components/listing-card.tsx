@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import VerificationBadge from '@/components/verification-badge';
 import CategoryIcon from '@/components/category-icon';
 import WishlistButton from '@/components/wishlist-button';
 import { eurRound } from '@/lib/format';
@@ -33,10 +34,13 @@ export default function ListingCard({ listing }: { listing: SearchResultItem }) 
         {typeLabel(listing.type)}
         {listing.maxGuests != null && ` · ${listing.maxGuests} pers.`}
       </p>
-      <p className="mt-1.5 text-sm text-ink">
-        <span className="font-semibold">{eurRound(listing.basePrice)}</span>
-        <span className="text-muted"> / {unit}</span>
-      </p>
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <p className="text-sm text-ink">
+          <span className="font-semibold">{eurRound(listing.basePrice)}</span>
+          <span className="text-muted"> / {unit}</span>
+        </p>
+        <VerificationBadge verifiedAt={listing.verifiedAt} />
+      </div>
     </Link>
   );
 }
