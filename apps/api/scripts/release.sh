@@ -4,7 +4,7 @@
 #     + migrations SQL manuelles (PostGIS, contraintes) + seed de démo ;
 #   - sinon rattrape toute migration SQL additionnelle non encore appliquée
 #     (voir la table `_SqlMigrations`) ;
-#   - démarre le serveur dans tous les cas.
+#   - démarre le serveur seulement après le succès des migrations.
 # Idempotent : sûr à relancer à chaque déploiement.
 set -e
 cd "$(dirname "$0")/.."   # -> apps/api
@@ -53,10 +53,11 @@ if [ "$INITIALIZED" != "1" ]; then
   log "Base vierge détectée — initialisation du schéma"
   psql "$PSQL_URL" -v ON_ERROR_STOP=1 -f prisma/sql/0001_extensions.sql
   log "prisma db push"
-  "$PRISMA" db push --skip-generate --accept-data-loss
+  "$PRISMA" db push --skip-generate
   log "Migrations SQL manuelles (PostGIS + contraintes)"
   psql "$PSQL_URL" -v ON_ERROR_STOP=1 -f prisma/sql/0002_postgis_geometry.sql
-  psql "$PSQL_URL" -v ON_ERROR_STOP=1 -f prisma/sql/0003_booking_constraints.sql
+  # 0003 cible les anciennes colonnes DATE ; ses contraintes sont remplacées
+  # par le groupe 0006, exécuté plus bas sur le schéma courant.
   psql "$PSQL_URL" -v ON_ERROR_STOP=1 -f prisma/sql/0004_instant_book.sql
   psql "$PSQL_URL" -v ON_ERROR_STOP=1 -c "$CREATE_LEDGER" >/dev/null
   psql "$PSQL_URL" -v ON_ERROR_STOP=1 -c \
@@ -64,10 +65,6 @@ if [ "$INITIALIZED" != "1" ]; then
       ('0001_extensions.sql'), ('0002_postgis_geometry.sql'),
       ('0003_booking_constraints.sql'), ('0004_instant_book.sql')
      ON CONFLICT DO NOTHING;" >/dev/null
-  if [ "${SEED_ON_INIT:-true}" = "true" ]; then
-    log "Seed de démonstration"
-    node prisma/dist/seed.js || echo "⚠ seed échoué (non bloquant)"
-  fi
   log "Schéma initialisé ✓"
 else
   log "Base déjà initialisée"
@@ -85,17 +82,50 @@ else
   fi
 fi
 
-# Rattrapage : applique toute migration SQL non encore jouée (0005+, etc.).
+# Les anciens scripts pre/post ne sont jamais parcourus directement : pre était
+# destructif, et l'ordre alphabétique plaçait post avant pre. Leur remplacement
+# convertit les colonnes puis restaure les contraintes dans UNE transaction.
 for f in prisma/sql/*.sql; do
   name=$(basename "$f")
-  already=$(psql "$PSQL_URL" -tAc "SELECT 1 FROM \"_SqlMigrations\" WHERE filename='$name';")
-  if [ "$already" != "1" ]; then
-    log "Migration : $name"
-    psql "$PSQL_URL" -v ON_ERROR_STOP=1 -f "$f"
-    psql "$PSQL_URL" -v ON_ERROR_STOP=1 -c \
-      "INSERT INTO \"_SqlMigrations\"(filename) VALUES ('$name') ON CONFLICT DO NOTHING;" >/dev/null
+  case "$name" in
+    0006_hourly_slots_pre.sql|0006_hourly_slots_post.sql) continue ;;
+  esac
+  case "$name" in
+    *[!a-zA-Z0-9_.-]*) echo "Nom de migration invalide" >&2; exit 1 ;;
+  esac
+  log "Vérification migration : $name"
+  if [ "$name" = "0006_hourly_slots_upgrade.sql" ]; then
+    psql "$PSQL_URL" -X --single-transaction -v ON_ERROR_STOP=1 <<SQL
+SELECT pg_advisory_xact_lock(20260919, 6);
+SELECT NOT EXISTS (SELECT 1 FROM "_SqlMigrations" WHERE filename = '$name') AS apply_migration \gset
+\if :apply_migration
+\i prisma/sql/0006_hourly_slots_upgrade.sql
+\i prisma/sql/0006_hourly_slots_post.sql
+INSERT INTO "_SqlMigrations" (filename) VALUES
+  ('0006_hourly_slots_upgrade.sql'), ('0006_hourly_slots_pre.sql'), ('0006_hourly_slots_post.sql')
+ON CONFLICT DO NOTHING;
+\endif
+SQL
+  else
+    # La migration et son entrée de registre sont atomiques. Le verrou empêche
+    # deux conteneurs de rejouer simultanément une même migration au redéploiement.
+    psql "$PSQL_URL" -X --single-transaction -v ON_ERROR_STOP=1 <<SQL
+SELECT pg_advisory_xact_lock(20260919, 6);
+SELECT NOT EXISTS (SELECT 1 FROM "_SqlMigrations" WHERE filename = '$name') AS apply_migration \gset
+\if :apply_migration
+\i $f
+INSERT INTO "_SqlMigrations" (filename) VALUES ('$name');
+\endif
+SQL
   fi
 done
+
+# Une ancienne base n'est jamais réensemencée. Sur une base neuve, attendre que
+# toutes les contraintes et tous les champs attendus par le seed soient prêts.
+if [ "$INITIALIZED" != "1" ] && [ "${SEED_ON_INIT:-true}" = "true" ]; then
+  log "Seed de démonstration"
+  node prisma/dist/seed.js || echo "⚠ seed échoué (non bloquant)"
+fi
 
 log "Démarrage du serveur NestJS"
 exec node dist/src/main.js

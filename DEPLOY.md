@@ -239,3 +239,34 @@ GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 GOOGLE_CALLBACK_URL=https://api-production-1a2b.up.railway.app/api/v1/auth/google/callback
 ```
+
+## Récupération : échec `0006_hourly_slots_post.sql` / `startAt` absent
+
+Le script historique parcourait les fichiers par ordre alphabétique (`post`
+passait avant `pre`), sans appliquer la transition du schéma Prisma aux bases
+existantes. Il ne suffit pas d'inverser ces deux fichiers : l'ancien `pre` vidait
+les réservations et les tables liées.
+
+Le correctif `0006_hourly_slots_upgrade.sql` :
+
+- renomme les anciennes colonnes `startDate`/`endDate` et les convertit en
+  `timestamptz`, sans suppression de lignes ;
+- interprète les anciennes dates à minuit **Europe/Paris**, conformément au
+  fuseau des créneaux de l'application ; les fins restent exclusives ;
+- ajoute les champs horaires, conditions d'accès, FAQ et tables du module
+  Commercial présents dans le nouveau schéma ;
+- rétablit les contraintes de réservation et enregistre le groupe de migration
+  dans la même transaction. En cas d'erreur, tout ce groupe est annulé ;
+- supporte une base déjà migrée et ne réensemence jamais une base existante.
+
+Avant application à une base contenant des données réelles, disposer d'une
+sauvegarde restaurable et confirmer que les anciennes dates sont bien des dates
+locales Europe/Paris. Le correctif de code n'applique rien à Railway à lui seul.
+Déployer ensuite la révision corrigée du service API, avec la commande habituelle
+`scripts/release.sh`. Ne pas exécuter l'ancien `pre`, ne pas vider le volume et ne
+pas lancer `prisma db push --accept-data-loss` sur la base existante.
+
+Les logs doivent atteindre `Démarrage du serveur NestJS`, puis
+`GET /api/v1/health` doit répondre avec un statut HTTP 200. Une autre erreur de
+schéma ou des réservations existantes incohérentes feront échouer la transaction
+sans supprimer les données : conserver ces logs pour diagnostic.
