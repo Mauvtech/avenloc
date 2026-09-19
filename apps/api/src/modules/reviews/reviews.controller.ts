@@ -56,6 +56,12 @@ export class ReviewsController {
     );
   }
 
+  @Get('reviews/host')
+  @UseGuards(JwtAuthGuard)
+  findByHost(@CurrentUser() user: AuthenticatedUser): Promise<ReviewResponseDto[]> {
+    return this.reviewsService.findByHost(user.id);
+  }
+
   @Get('reviews/pending')
   @UseGuards(JwtAuthGuard)
   findPending(

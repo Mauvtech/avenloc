@@ -3,8 +3,10 @@ import type {
   ListingStatus,
   PricingUnit,
   CancellationPolicy,
+  AccessMethod,
   ListingPhoto,
   ListingAvailability,
+  ListingFaqItem,
 } from '@prisma/client';
 
 export class ListingResponseDto {
@@ -31,10 +33,28 @@ export class ListingResponseDto {
   instantBookEnabled: boolean;
   amenities: string[];
   specificAttributes: unknown;
+
+  // Créneaux horaires
+  openDays: number[];
+  openStartTime: string;
+  openEndTime: string;
+  minDurationMinutes: number;
+  minNoticeHours: number;
+
+  // Conditions d'accès et d'usage
+  accessMethod: AccessMethod | null;
+  accessInstructions: string | null;
+  activityValidationRequired: boolean;
+  rcProRequired: boolean;
+  houseRules: string | null;
+
+  establishmentId: string | null;
+
   createdAt: Date;
   updatedAt: Date;
   photos: ListingPhoto[];
   availabilities?: ListingAvailability[];
+  faqItems?: ListingFaqItem[];
   /** true si l'hôte a finalisé sa configuration d'encaissement (compte Stripe actif). */
   hostPaymentsReady: boolean;
   host: {

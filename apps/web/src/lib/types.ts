@@ -29,10 +29,26 @@ export interface ListingPhoto {
 export interface ListingAvailability {
   id: string;
   listingId: string;
-  startDate: string;
-  endDate: string; // exclusif
+  startAt: string;
+  endAt: string; // exclusif
   isAvailable: boolean;
 }
+
+export interface ListingFaqItem {
+  id: string;
+  listingId: string;
+  question: string;
+  answer: string;
+  position: number;
+}
+
+export interface Slot {
+  startAt: string;
+  endAt: string;
+  available: boolean;
+}
+
+export type AccessMethod = 'CONNECTED_LOCK' | 'ACCESS_CODE' | 'KEY_BOX' | 'QR_CODE' | 'RECEPTION';
 
 export interface Listing {
   id: string;
@@ -57,7 +73,26 @@ export interface Listing {
   instantBookEnabled: boolean;
   amenities: string[];
   specificAttributes: Record<string, unknown> | null;
+
+  // Créneaux horaires
+  openDays: number[];
+  openStartTime: string;
+  openEndTime: string;
+  minDurationMinutes: number;
+  minNoticeHours: number;
+
+  // Conditions d'accès et d'usage
+  accessMethod: AccessMethod | null;
+  accessInstructions: string | null;
+  activityValidationRequired: boolean;
+  rcProRequired: boolean;
+  houseRules: string | null;
+
+  establishmentId: string | null;
+
   photos: ListingPhoto[];
+  availabilities?: ListingAvailability[];
+  faqItems?: ListingFaqItem[];
   hostPaymentsReady?: boolean;
   host?: {
     id: string;
@@ -75,8 +110,8 @@ export interface Booking {
   listingId: string;
   tenantId: string;
   status: string;
-  startDate: string;
-  endDate: string;
+  startAt: string;
+  endAt: string;
   unitCount: number;
   baseAmount: string;
   cleaningFee: string;
@@ -86,6 +121,9 @@ export interface Booking {
   guestCount: number;
   guestNote: string | null;
   arrivalTime: string | null;
+  activityDescription: string | null;
+  rcProAccepted: boolean;
+  houseRulesAccepted: boolean;
   hostApprovalDeadline: string | null;
   listing?: Partial<Listing> & Pick<Listing, 'title' | 'city' | 'type'>;
   tenant?: { firstName: string; lastName: string; avatarUrl: string | null };
@@ -143,9 +181,11 @@ export interface Review {
   target: string;
   rating: number;
   comment: string | null;
+  criteria: string | null;
   isPublic: boolean;
   listingId: string | null;
   tenantSubjectId: string | null;
+  listingTitle?: string;
   author?: { firstName: string; lastName: string };
   createdAt: string;
 }
@@ -215,6 +255,52 @@ export interface SearchResult {
   total: number;
   page: number;
   limit: number;
+}
+
+// ─── Module Commercial ──────────────────────────────────────────────────────
+
+export interface Establishment {
+  id: string;
+  hostId: string;
+  createdById: string;
+  name: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  postalCode: string;
+  country: string;
+  latitude: number | null;
+  longitude: number | null;
+  listings?: { id: string; title: string; status?: string }[];
+  createdAt: string;
+}
+
+export type HostInvitationStatus = 'SENT' | 'ACCEPTED' | 'EXPIRED';
+
+export interface HostInvitation {
+  id: string;
+  establishmentId: string;
+  listingId: string | null;
+  commercialId: string;
+  status: HostInvitationStatus;
+  hostEmail: string;
+  hostFirstName: string | null;
+  hostLastName: string | null;
+  hostPhone: string | null;
+  token: string;
+  sentAt: string;
+  acceptedAt: string | null;
+  establishment?: Establishment;
+  listing?: Partial<Listing> & Pick<Listing, 'id' | 'title' | 'status' | 'type'>;
+  createdAt: string;
+}
+
+export interface CreateLeadResult {
+  host: User;
+  establishment: Establishment;
+  listing: Listing;
+  invitation: HostInvitation;
+  devInvitationUrl?: string;
 }
 
 export interface RegisterData {

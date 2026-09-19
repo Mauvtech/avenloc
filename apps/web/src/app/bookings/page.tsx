@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { isAuthenticated, loginHref } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
 import { EmptyState, PageHeader, Skeleton } from '@/components/ui';
-import { dateShort, eur } from '@/lib/format';
+import { dateShort, eur, timeLabel } from '@/lib/format';
 import type { Booking } from '@/lib/types';
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -64,7 +64,7 @@ export default function BookingsPage() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold">{b.listing?.title ?? 'Annonce'}</p>
                 <p className="text-xs text-muted">
-                  {dateShort(b.startDate)} → {dateShort(b.endDate)} · {b.guestCount} pers. · {eur(b.totalAmount)}
+                  {dateShort(b.startAt)} · {timeLabel(b.startAt)}–{timeLabel(b.endAt)} · {b.guestCount} pers. · {eur(b.totalAmount)}
                 </p>
               </div>
               <span

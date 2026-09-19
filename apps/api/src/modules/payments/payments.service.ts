@@ -680,4 +680,23 @@ export class PaymentsService {
       },
     });
   }
+
+  /** Historique des encaissements d'un hôte — onglet Finances du dashboard. */
+  async getHostPaymentHistory(hostId: string) {
+    return this.prisma.payment.findMany({
+      where: { booking: { listing: { hostId } } },
+      include: {
+        booking: {
+          select: {
+            id: true,
+            startAt: true,
+            endAt: true,
+            listing: { select: { id: true, title: true } },
+            tenant: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }

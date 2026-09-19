@@ -70,8 +70,8 @@ export default function DateRangeField({ startDate, endDate, onChange }: Props) 
             months={2}
             onDayClick={pick}
             dayClassName={(iso) => {
-              if (iso === startDate || iso === endDate) return 'bg-brand text-white font-semibold';
-              if (selected.has(iso)) return 'bg-brand-tint text-brand-fg';
+              if (iso === startDate || iso === endDate) return 'bg-ink text-white font-semibold';
+              if (selected.has(iso)) return 'bg-canvas text-ink';
               return '';
             }}
           />

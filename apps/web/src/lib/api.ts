@@ -4,6 +4,8 @@ import type {
   Listing,
   ListingPhoto,
   ListingAvailability,
+  ListingFaqItem,
+  Slot,
   Booking,
   Conversation,
   Message,
@@ -14,6 +16,9 @@ import type {
   Deposit,
   RegisterData,
   LoginData,
+  Establishment,
+  HostInvitation,
+  CreateLeadResult,
 } from './types';
 
 const API_URL =
@@ -153,18 +158,34 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ order }),
       }),
-    // Calendrier de disponibilité
+    // Calendrier de disponibilité (créneaux horaires)
     availability: (id: string) =>
       apiFetch<ListingAvailability[]>(`/listings/${id}/availability`),
     unavailable: (id: string) =>
       apiFetch<{ start: string; end: string }[]>(`/listings/${id}/unavailable`),
-    blockDates: (id: string, startDate: string, endDate: string) =>
+    // Grille de créneaux réservables d'une journée (date au format YYYY-MM-DD).
+    slots: (id: string, date: string) =>
+      apiFetch<Slot[]>(`/listings/${id}/slots?date=${date}`),
+    blockDay: (id: string, date: string, isAvailable = false) =>
       apiFetch<ListingAvailability>(`/listings/${id}/availability`, {
         method: 'POST',
-        body: JSON.stringify({ startDate, endDate, isAvailable: false }),
+        body: JSON.stringify({ date, isAvailable }),
       }),
     unblock: (id: string, availId: string) =>
       apiFetch<void>(`/listings/${id}/availability/${availId}`, { method: 'DELETE' }),
+    // FAQ par annonce
+    addFaqItem: (id: string, data: { question: string; answer: string }) =>
+      apiFetch<ListingFaqItem>(`/listings/${id}/faq`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    updateFaqItem: (id: string, faqId: string, data: { question?: string; answer?: string }) =>
+      apiFetch<ListingFaqItem>(`/listings/${id}/faq/${faqId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    deleteFaqItem: (id: string, faqId: string) =>
+      apiFetch<void>(`/listings/${id}/faq/${faqId}`, { method: 'DELETE' }),
   },
   bookings: {
     create: (data: unknown) =>
@@ -188,7 +209,7 @@ export const api = {
       apiFetch<Booking>(`/bookings/${id}/complete`, { method: 'POST' }),
     cancel: (id: string) =>
       apiFetch<Booking>(`/bookings/${id}/cancel`, { method: 'POST' }),
-    quote: (data: { listingId: string; startDate: string; endDate: string }) =>
+    quote: (data: { listingId: string; date: string; startTime: string; endTime: string }) =>
       apiFetch<Quote>('/bookings/quote', { method: 'POST', body: JSON.stringify(data) }),
   },
   deposits: {
@@ -239,6 +260,7 @@ export const api = {
       }),
     byListing: (id: string) =>
       apiFetch<ReviewList>(`/listings/${id}/reviews`),
+    byHost: () => apiFetch<Review[]>('/reviews/host'),
     pending: () => apiFetch<Booking[]>('/reviews/pending'),
   },
   users: {
@@ -270,6 +292,7 @@ export const api = {
     // Renvoie l'URL d'onboarding hébergée par Stripe (Connect Express).
     onboard: () =>
       apiFetch<{ url: string }>('/payments/connect/onboard', { method: 'POST' }),
+    hostHistory: () => apiFetch<PaymentHistoryItem[]>('/payments/host-history'),
   },
   features: {
     get: () => apiFetch<FeaturesResponse>('/features'),
@@ -277,6 +300,23 @@ export const api = {
       apiFetch<FeaturesResponse>('/features', {
         method: 'PATCH',
         body: JSON.stringify(patch),
+      }),
+  },
+  commercial: {
+    establishmentsByHostEmail: (hostEmail: string) =>
+      apiFetch<Establishment[]>(`/commercial/establishments?hostEmail=${encodeURIComponent(hostEmail)}`),
+    createLead: (data: unknown) =>
+      apiFetch<CreateLeadResult>('/commercial/leads', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    history: () => apiFetch<HostInvitation[]>('/commercial/history'),
+    invitationPreview: (token: string) =>
+      apiFetch<HostInvitation>(`/commercial/invitations/${token}`),
+    acceptInvitation: (token: string, password: string) =>
+      apiFetch<TokenResponse>(`/commercial/invitations/${token}/accept`, {
+        method: 'POST',
+        body: JSON.stringify({ password }),
       }),
   },
 };
@@ -287,6 +327,24 @@ export interface FeatureFlags {
 export interface FeaturesResponse {
   flags: FeatureFlags;
   adminEnabled: boolean;
+}
+
+export interface PaymentHistoryItem {
+  id: string;
+  status: string;
+  amount: string;
+  platformFee: string;
+  hostPayout: string;
+  currency: string;
+  capturedAt: string | null;
+  createdAt: string;
+  booking: {
+    id: string;
+    startAt: string;
+    endAt: string;
+    listing: { id: string; title: string };
+    tenant: { firstName: string; lastName: string };
+  };
 }
 
 export interface ConnectStatus {

@@ -21,6 +21,7 @@ enum AuthProvider {
 enum UserRole {
   TENANT
   HOST
+  COMMERCIAL
 }
 
 enum IdentityStatus {
@@ -39,6 +40,10 @@ enum ListingType {
   WAREHOUSE
   EVENT_SPACE
   PARKING
+  SHOP
+  PRACTICE_ROOM
+  RESTAURANT
+  CREATIVE_STUDIO
   OTHER
 }
 
@@ -48,10 +53,18 @@ enum PricingUnit {
   DAY
 }
 
+enum AccessMethod {
+  CONNECTED_LOCK // serrure connectée, déverrouillage à distance depuis la confirmation
+  ACCESS_CODE // code numérique communiqué à la confirmation
+  KEY_BOX // boîte à clés sécurisée sur place
+  QR_CODE // QR code scanné à l'arrivée
+  RECEPTION // remise en main propre par un accueil
+}
+
 enum CancellationPolicy {
-  FLEXIBLE       // remboursement si annulation > 24h avant
-  MODERATE       // remboursement si annulation > 5 jours avant
-  STRICT         // remboursement 50% si annulation > 7 jours avant
+  FLEXIBLE // remboursement si annulation > 24h avant
+  MODERATE // remboursement si annulation > 5 jours avant
+  STRICT // remboursement 50% si annulation > 7 jours avant
   NON_REFUNDABLE
 }
 
@@ -59,6 +72,9 @@ enum ListingStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
+  // Fiche créée pour un hôte par un commercial (visite terrain) : en attente que
+  // l'hôte se connecte, relise et complète l'annonce avant de la publier lui-même.
+  PENDING_VALIDATION
 }
 
 enum BookingStatus {
@@ -85,17 +101,23 @@ enum MessageSenderRole {
 // Pas de valeur "NONE" : l'absence de ligne Deposit signifie qu'aucune caution
 // n'est requise pour cette réservation.
 enum DepositStatus {
-  AUTHORIZED        // empreinte posée, fonds bloqués mais non débités
+  AUTHORIZED // empreinte posée, fonds bloqués mais non débités
   CAPTURE_REQUESTED // l'hôte a demandé une capture — le locataire a 48h pour contester
-  CAPTURED          // capture effectuée (totale ou partielle, voir capturedAmount)
-  CONTESTED         // contestée par le locataire — en attente de médiation manuelle
-  RELEASED          // empreinte libérée sans capture (fin de séjour sans réclamation)
-  EXPIRED           // empreinte expirée chez le prestataire avant d'avoir pu être traitée
+  CAPTURED // capture effectuée (totale ou partielle, voir capturedAmount)
+  CONTESTED // contestée par le locataire — en attente de médiation manuelle
+  RELEASED // empreinte libérée sans capture (fin de séjour sans réclamation)
+  EXPIRED // empreinte expirée chez le prestataire avant d'avoir pu être traitée
 }
 
 enum ReviewTarget {
   LISTING // locataire note le local
-  TENANT  // hôte note le locataire
+  TENANT // hôte note le locataire
+}
+
+enum HostInvitationStatus {
+  SENT // lien d'activation envoyé, en attente que l'hôte crée son mot de passe
+  ACCEPTED // compte hôte activé
+  EXPIRED // délai d'activation dépassé
 }
 
 // ─── USERS ────────────────────────────────────────────────────────────────────
@@ -103,7 +125,7 @@ enum ReviewTarget {
 model User {
   id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email          String         @unique
-  hashedPassword String?        // null si OAuth uniquement
+  hashedPassword String? // null si OAuth uniquement
   firstName      String
   lastName       String
   avatarUrl      String?
@@ -111,7 +133,7 @@ model User {
   phone          String?
   roles          UserRole[]     @default([TENANT])
   identityStatus IdentityStatus @default(UNVERIFIED)
-  identityData   Json?          // stub KYC : champs réservés, non implémentés en V1
+  identityData   Json? // stub KYC : champs réservés, non implémentés en V1
 
   // Stripe Connect (rôle hôte)
   stripeAccountId     String? @unique
@@ -135,6 +157,11 @@ model User {
 
   conversationsAsTenant Conversation[] @relation("ConversationTenant")
   conversationsAsHost   Conversation[] @relation("ConversationHost")
+
+  // Module Commercial : établissements possédés (en tant qu'hôte) vs créés (en tant que commercial).
+  establishments        Establishment[]  @relation("EstablishmentHost")
+  establishmentsCreated Establishment[]  @relation("EstablishmentCreatedBy")
+  hostInvitationsSent   HostInvitation[] @relation("HostInvitationCommercial")
 
   @@index([email])
 }
@@ -172,36 +199,36 @@ model RefreshToken {
 // Modifiable par un admin via API protégée — pas de migration si le taux global change.
 // Lecture mise en cache Redis (clé "platform:config", TTL 5 min) — invalidée à chaque update.
 model PlatformConfig {
-  id                     String   @id @default("default")
-  serviceFeeRate         Decimal  @db.Decimal(5, 4) @default(0.1200) // 12% par défaut
-  taxRate                Decimal  @db.Decimal(5, 4) @default(0.2000) // TVA 20% par défaut
-  currency               String   @default("EUR")
+  id                      String   @id @default("default")
+  serviceFeeRate          Decimal  @default(0.1200) @db.Decimal(5, 4) // 12% par défaut
+  taxRate                 Decimal  @default(0.2000) @db.Decimal(5, 4) // TVA 20% par défaut
+  currency                String   @default("EUR")
   // Fenêtre de validation hôte (en heures) pour les réservations non-instant-book.
   // Au-delà, le job de nettoyage annule automatiquement la réservation PENDING.
-  hostApprovalWindowHours Int     @default(24)
-  updatedAt              DateTime @updatedAt
+  hostApprovalWindowHours Int      @default(24)
+  updatedAt               DateTime @updatedAt
 }
 
 // Snapshot horodaté à chaque modification de PlatformConfig.
 // Source de vérité pour les audits comptables et légaux sur les taux appliqués.
 // Jamais modifiée ni supprimée (append-only).
 model PlatformConfigHistory {
-  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  serviceFeeRate         Decimal  @db.Decimal(5, 4)
-  taxRate                Decimal  @db.Decimal(5, 4)
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  serviceFeeRate          Decimal  @db.Decimal(5, 4)
+  taxRate                 Decimal  @db.Decimal(5, 4)
   hostApprovalWindowHours Int
-  currency               String
-  changedAt              DateTime @default(now())
-  changedBy              String?  @db.Uuid // userId admin — null si changement système
+  currency                String
+  changedAt               DateTime @default(now())
+  changedBy               String?  @db.Uuid // userId admin — null si changement système
 }
 
 // ─── LISTINGS ─────────────────────────────────────────────────────────────────
 
 model Listing {
-  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  hostId      String        @db.Uuid
-  type        ListingType
-  status      ListingStatus @default(DRAFT)
+  id     String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hostId String        @db.Uuid
+  type   ListingType
+  status ListingStatus @default(DRAFT)
 
   title       String
   description String
@@ -211,7 +238,7 @@ model Listing {
   addressLine2 String?
   city         String
   postalCode   String
-  country      String @default("FR")
+  country      String  @default("FR")
 
   // Coordonnées stockées en Float pour Prisma ORM.
   // Une colonne PostGIS `location geometry(Point, 4326)` est maintenue en synchrone
@@ -243,6 +270,22 @@ model Listing {
   // Impact Stripe : false → capture_method: 'manual' sur le PaymentIntent (autorisation différée).
   instantBookEnabled Boolean @default(false)
 
+  // ── Créneaux horaires ────────────────────────────────────────────────────────
+  // Horaires d'ouverture hebdomadaires utilisés pour générer la grille de créneaux
+  // réservables (voir availability-rules.util.ts côté API). openDays : 0=dimanche..6=samedi.
+  openDays           Int[]  @default([1, 2, 3, 4, 5])
+  openStartTime      String @default("08:00") // "HH:mm", heure locale Europe/Paris
+  openEndTime        String @default("19:00")
+  minDurationMinutes Int    @default(60)
+  minNoticeHours     Int    @default(0) // délai minimum avant le début du créneau pour réserver
+
+  // ── Conditions d'accès et d'usage ────────────────────────────────────────────
+  accessMethod               AccessMethod?
+  accessInstructions         String? // code / lien / consignes — révélé seulement après confirmation
+  activityValidationRequired Boolean       @default(false) // l'hôte doit valider manuellement l'activité prévue
+  rcProRequired              Boolean       @default(false) // assurance RC Pro exigée du locataire
+  houseRules                 String? // règlement intérieur affiché avant réservation
+
   // Tags normalisés — valeurs contrôlées par une enum applicative (non Prisma)
   amenities String[]
 
@@ -254,27 +297,48 @@ model Listing {
   //   OFFICE             : { "surface_m2": 25, "standing_desk": true }
   specificAttributes Json?
 
+  // Rattachement optionnel à un établissement (regroupement créé via le module Commercial).
+  establishmentId String? @db.Uuid
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  host           User                  @relation(fields: [hostId], references: [id])
-  photos         ListingPhoto[]
-  availabilities ListingAvailability[]
-  bookings       Booking[]
-  reviews        Review[]
-  conversations  Conversation[]
+  host            User                  @relation(fields: [hostId], references: [id])
+  establishment   Establishment?        @relation(fields: [establishmentId], references: [id])
+  photos          ListingPhoto[]
+  availabilities  ListingAvailability[]
+  faqItems        ListingFaqItem[]
+  bookings        Booking[]
+  reviews         Review[]
+  conversations   Conversation[]
+  hostInvitations HostInvitation[]
 
   @@index([hostId])
   @@index([type])
   @@index([city])
   @@index([basePrice])
   @@index([status])
+  @@index([establishmentId])
+}
+
+// FAQ libre par annonce (question/réponse), affichée sur la fiche.
+model ListingFaqItem {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  listingId String   @db.Uuid
+  question  String
+  answer    String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
 }
 
 model ListingPhoto {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   listingId String   @db.Uuid
-  url       String   // clé S3 (pas l'URL signée — celle-ci est générée à la volée)
+  url       String // clé S3 (pas l'URL signée — celle-ci est générée à la volée)
   position  Int      @default(0)
   caption   String?
   createdAt DateTime @default(now())
@@ -284,13 +348,14 @@ model ListingPhoto {
   @@index([listingId])
 }
 
-// Fenêtres de disponibilité définies par l'hôte.
-// isAvailable = false → blocage manuel (déplacement personnel, travaux, etc.)
+// Blocages ou exceptions ponctuelles définis par l'hôte, en plus des horaires
+// d'ouverture récurrents (Listing.openDays/openStartTime/openEndTime).
+// isAvailable = false → fermeture manuelle (déplacement personnel, travaux, jour férié, etc.)
 model ListingAvailability {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   listingId   String   @db.Uuid
-  startDate   DateTime @db.Date
-  endDate     DateTime @db.Date // exclusif, même convention que Booking
+  startAt     DateTime @db.Timestamptz // horodatage précis, pas seulement une date
+  endAt       DateTime @db.Timestamptz // exclusif, même convention que Booking
   isAvailable Boolean  @default(true)
 
   listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
@@ -306,14 +371,14 @@ model Booking {
   tenantId  String        @db.Uuid
   status    BookingStatus @default(PENDING)
 
-  // Convention endDate EXCLUSIF : la réservation couvre [startDate, endDate[.
-  // Exemple : du 10 au 12 juillet = startDate 2024-07-10, endDate 2024-07-12 → 2 nuits.
-  // Contrainte CHECK (startDate < endDate) garantie en migration brute (0003).
-  startDate DateTime @db.Date
-  endDate   DateTime @db.Date
+  // Réservation par créneau horaire. Convention endAt EXCLUSIF : le créneau
+  // couvre [startAt, endAt[. Exemple : 14h-16h le 10 juillet 2026 →
+  // startAt 2026-07-10T14:00:00+02:00, endAt 2026-07-10T16:00:00+02:00 → 2 heures.
+  // Contrainte CHECK (startAt < endAt) garantie en migration brute (0003/0006).
+  startAt DateTime @db.Timestamptz
+  endAt   DateTime @db.Timestamptz
 
-  // unitCount = nombre d'unités facturées (nuits, heures ou jours).
-  // L'interprétation dépend de Listing.pricingUnit — pas de champ redondant "nights".
+  // unitCount = nombre d'unités facturées (heures, nuits ou jours selon Listing.pricingUnit).
   unitCount Int
 
   // ── Snapshot financier ──────────────────────────────────────────────────────
@@ -324,14 +389,20 @@ model Booking {
   // Payment.platformFee : montant effectivement prélevé par Stripe lors de la capture.
   // Les deux coexistent volontairement — voir ARCHITECTURE.md §"Booking vs Payment".
   baseAmount  Decimal @db.Decimal(10, 2)
-  cleaningFee Decimal @db.Decimal(10, 2) @default(0)
+  cleaningFee Decimal @default(0) @db.Decimal(10, 2)
   serviceFee  Decimal @db.Decimal(10, 2)
-  taxAmount   Decimal @db.Decimal(10, 2) @default(0)
+  taxAmount   Decimal @default(0) @db.Decimal(10, 2)
   totalAmount Decimal @db.Decimal(10, 2)
 
   guestCount  Int     @default(1)
   guestNote   String? // message / instructions du locataire pour l'hôte
   arrivalTime String? // heure d'arrivée prévue (ex. "14:30")
+
+  // Renseignés à la réservation lorsque l'annonce l'exige (voir Listing.activityValidationRequired
+  // / rcProRequired) — conservés tels quels même si l'annonce change ensuite.
+  activityDescription String?
+  rcProAccepted       Boolean @default(false)
+  houseRulesAccepted  Boolean @default(false)
 
   // Deadline de validation hôte. Null si Listing.instantBookEnabled = true.
   // Calculé à la création : now() + PlatformConfig.hostApprovalWindowHours.
@@ -351,7 +422,7 @@ model Booking {
   @@index([listingId])
   @@index([tenantId])
   @@index([status])
-  @@index([listingId, startDate, endDate])
+  @@index([listingId, startAt, endAt])
 }
 
 // ─── PAYMENTS ─────────────────────────────────────────────────────────────────
@@ -368,7 +439,7 @@ model Payment {
   amount         Decimal @db.Decimal(10, 2) // = Booking.totalAmount
   platformFee    Decimal @db.Decimal(10, 2) // commission effectivement prélevée par Stripe
   hostPayout     Decimal @db.Decimal(10, 2) // = amount - platformFee (net reçu par l'hôte)
-  refundedAmount Decimal @db.Decimal(10, 2) @default(0)
+  refundedAmount Decimal @default(0) @db.Decimal(10, 2)
 
   currency   String    @default("EUR")
   capturedAt DateTime?
@@ -396,9 +467,9 @@ model Deposit {
   expiresAt    DateTime? // durée de vie donnée par Stripe (~7 jours) — sert au job de renouvellement
 
   // ── Réclamation hôte ─────────────────────────────────────────────────────
-  captureReason      String?  // motif : dégradation, no-show, retard, dépassement…
+  captureReason      String? // motif : dégradation, no-show, retard, dépassement…
   captureRequestedAt DateTime? // point de départ du délai de contestation (48h)
-  proofUrls          String[] @default([]) // preuves photo jointes par l'hôte
+  proofUrls          String[]  @default([]) // preuves photo jointes par l'hôte
 
   // ── Résolution ───────────────────────────────────────────────────────────
   capturedAmount Decimal?  @db.Decimal(10, 2) // montant réellement capturé (≤ amount)
@@ -426,9 +497,9 @@ model Conversation {
   createdAt DateTime @default(now())
 
   messages Message[]
-  listing  Listing @relation(fields: [listingId], references: [id])
-  tenant   User    @relation("ConversationTenant", fields: [tenantId], references: [id])
-  host     User    @relation("ConversationHost", fields: [hostId], references: [id])
+  listing  Listing   @relation(fields: [listingId], references: [id])
+  tenant   User      @relation("ConversationTenant", fields: [tenantId], references: [id])
+  host     User      @relation("ConversationHost", fields: [hostId], references: [id])
 
   @@index([tenantId])
   @@index([hostId])
@@ -461,8 +532,9 @@ model Review {
   authorId  String       @db.Uuid
   target    ReviewTarget
 
-  rating   Int     // 1 à 5 — validé au niveau applicatif (1 ≤ rating ≤ 5)
+  rating   Int // 1 à 5 — validé au niveau applicatif (1 ≤ rating ≤ 5)
   comment  String?
+  criteria String? // critères évalués, texte libre (ex. "Propreté, conformité, accès")
   isPublic Boolean @default(true)
 
   // Relation polymorphique : exactement l'un des deux est non-null selon target.
@@ -486,4 +558,64 @@ model Review {
   @@index([bookingId])
   @@index([authorId])
   @@index([listingId])
+}
+
+// ─── COMMERCIAL ───────────────────────────────────────────────────────────────
+// Regroupement d'annonces créées lors d'une visite terrain par un commercial pour
+// le compte d'un hôte (ex. plusieurs salles dans un même immeuble). L'hôte n'a
+// pas forcément de compte au moment de la création — voir HostInvitation.
+model Establishment {
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hostId      String @db.Uuid
+  createdById String @db.Uuid // le commercial à l'origine de la fiche
+
+  name         String
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  postalCode   String
+  country      String  @default("FR")
+  latitude     Float?
+  longitude    Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  host        User             @relation("EstablishmentHost", fields: [hostId], references: [id])
+  createdBy   User             @relation("EstablishmentCreatedBy", fields: [createdById], references: [id])
+  listings    Listing[]
+  invitations HostInvitation[]
+
+  @@index([hostId])
+  @@index([createdById])
+}
+
+// Invitation envoyée par un commercial à un hôte rencontré sur le terrain pour
+// qu'il active son compte et reprenne la main sur la fiche pré-remplie.
+// Pas d'envoi d'email réel (aucun mailer dans le projet) : même pattern que
+// AuthService.forgotPassword — le lien est loggé et renvoyé en clair hors production.
+model HostInvitation {
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  establishmentId String               @db.Uuid
+  listingId       String?              @db.Uuid
+  commercialId    String               @db.Uuid
+  status          HostInvitationStatus @default(SENT)
+
+  hostEmail     String
+  hostFirstName String?
+  hostLastName  String?
+  hostPhone     String?
+
+  token      String    @unique
+  sentAt     DateTime  @default(now())
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  listing       Listing?      @relation(fields: [listingId], references: [id])
+  commercial    User          @relation("HostInvitationCommercial", fields: [commercialId], references: [id])
+
+  @@index([establishmentId])
+  @@index([commercialId])
+  @@index([hostEmail])
 }

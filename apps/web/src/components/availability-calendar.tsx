@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { addDays, daysBetween, fromISO, toISO } from '@/lib/calendar';
+import { daysBetween } from '@/lib/calendar';
 import MonthCalendar from '@/components/month-calendar';
 import { PageLoader } from '@/components/ui';
 
@@ -22,7 +22,7 @@ export default function AvailabilityCalendar({ listingId }: Props) {
     const map = new Map<string, string>();
     for (const row of rows) {
       if (row.isAvailable) continue;
-      for (const day of daysBetween(row.startDate, row.endDate)) map.set(day, row.id);
+      for (const day of daysBetween(row.startAt, row.endAt)) map.set(day, row.id);
     }
     setBlocked(map);
   }, [listingId]);
@@ -39,7 +39,7 @@ export default function AvailabilityCalendar({ listingId }: Props) {
       if (existingId) {
         await api.listings.unblock(listingId, existingId);
       } else {
-        await api.listings.blockDates(listingId, iso, toISO(addDays(fromISO(iso), 1)));
+        await api.listings.blockDay(listingId, iso);
       }
       await load();
     } catch (err) {

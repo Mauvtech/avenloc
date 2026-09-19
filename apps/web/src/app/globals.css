@@ -7,14 +7,14 @@
     scroll-behavior: smooth;
   }
   body {
-    @apply bg-canvas text-ink font-sans antialiased;
+    @apply bg-surface text-ink font-sans antialiased;
     text-rendering: optimizeLegibility;
   }
   h1,
   h2,
   h3,
   h4 {
-    @apply font-extrabold tracking-tight text-ink;
+    @apply font-bold tracking-tight text-ink;
     text-wrap: balance;
   }
   a {
@@ -32,36 +32,41 @@
 
 @layer components {
   /* ── Champs ─────────────────────────────────────────────────────────── */
+  /* border BORDER, radius 8, padding "10px 12px", fontSize 14 — comme les
+     inputs du prototype (AuthScreen, CommercialWizard…). Pas d'ombre. */
   .field {
-    @apply w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink shadow-xs outline-none transition-all;
+    @apply w-full rounded border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors;
   }
   .field::placeholder {
     @apply text-muted/70;
   }
   .field:hover {
-    @apply border-ink/20;
+    @apply border-ink/25;
   }
   .field:focus {
     @apply border-brand;
     box-shadow: theme('boxShadow.focus');
   }
   .label {
-    @apply mb-1.5 block text-xs font-semibold text-ink/70;
+    @apply mb-1.5 block text-xs font-semibold text-muted;
   }
   .hint {
     @apply mt-1 text-xs text-muted;
   }
 
   /* ── Boutons ────────────────────────────────────────────────────────── */
+  /* Plat, sans ombre : bg ACCENT plein pour le primaire, bordure BORDER pour
+     le secondaire — comme tous les boutons du prototype (AuthScreen,
+     ClientDetail, HostDashboard…). */
   .btn {
-    @apply inline-flex select-none items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold transition-all
-           disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.98];
+    @apply inline-flex select-none items-center justify-center gap-2 rounded px-4 py-2.5 text-sm font-semibold transition-colors
+           disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-brand text-white shadow-xs hover:bg-brand-hover hover:shadow-raised;
+    @apply btn bg-brand text-white hover:bg-brand-hover;
   }
   .btn-ghost {
-    @apply btn border border-line bg-surface text-ink shadow-xs hover:border-ink/20 hover:bg-canvas;
+    @apply btn border border-line bg-surface text-ink hover:bg-canvas;
   }
   .btn-subtle {
     @apply btn bg-canvas text-ink hover:bg-line/60;
@@ -77,30 +82,38 @@
   }
 
   /* ── Surfaces ───────────────────────────────────────────────────────── */
+  /* Bordure fine + radius 12, jamais d'ombre — StatCard / ClientDetail booking
+     box / notifications du prototype sont toutes construites ainsi. */
   .card {
-    @apply rounded-lg border border-line bg-surface shadow-card;
+    @apply rounded-lg border border-line bg-surface;
   }
   .card-hover {
-    @apply transition-all hover:-translate-y-0.5 hover:shadow-raised;
+    @apply transition-colors hover:border-ink/25;
   }
 
   /* ── Pastilles ──────────────────────────────────────────────────────── */
+  /* Pill({text,bg,color}) du prototype : fontSize 12, weight 500, radius 999,
+     padding "4px 10px" — pas de majuscules ni de graisse forte. */
   .badge {
-    @apply inline-flex items-center gap-1 rounded-full bg-brand-tint px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand-fg;
+    @apply inline-flex items-center gap-1 rounded-full bg-canvas px-2.5 py-1 text-[12px] font-medium text-ink;
   }
+  /* FilterChips du prototype : inactif = bordure BORDER + texte INK (pas gris) ;
+     actif = fond INK plein + texte blanc (jamais bleu). */
   .chip {
-    @apply inline-flex flex-none items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-[13px] font-semibold text-muted transition-colors hover:border-ink/20 hover:text-ink;
+    @apply inline-flex flex-none items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 py-1.5 text-[13px] font-medium text-ink transition-colors hover:border-ink/30;
   }
   .chip-active {
-    @apply border-brand bg-brand text-white hover:text-white;
+    @apply border-ink bg-ink text-white hover:border-ink;
   }
 
   /* ── Divers ─────────────────────────────────────────────────────────── */
+  /* Intitulés de section ("Équipements", "Actions"…) : fontSize 14, weight 600,
+     police système (Space Grotesk est réservé au logo dans le prototype). */
   .section-title {
-    @apply text-[17px] font-extrabold tracking-tight text-ink;
+    @apply text-[14px] font-semibold tracking-tight text-ink;
   }
   .skeleton {
-    @apply relative overflow-hidden rounded-md bg-line/50;
+    @apply relative overflow-hidden rounded bg-line/50;
   }
   .skeleton::after {
     content: '';
@@ -108,7 +121,7 @@
     background: linear-gradient(
       90deg,
       transparent,
-      oklch(1 0 0 / 0.45),
+      rgba(255, 255, 255, 0.45),
       transparent
     );
     animation: shimmer 1.4s infinite;

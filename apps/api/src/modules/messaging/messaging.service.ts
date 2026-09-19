@@ -87,8 +87,8 @@ export class MessagingService {
         id: true,
         tenantId: true,
         listingId: true,
-        startDate: true,
-        endDate: true,
+        startAt: true,
+        endAt: true,
         arrivalTime: true,
         guestNote: true,
         listing: { select: { hostId: true } },
@@ -105,9 +105,10 @@ export class MessagingService {
       },
     });
 
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
+    const fmtTime = (d: Date) => d.toISOString().slice(11, 16);
     const parts = [
-      `Bonjour, réservation confirmée du ${fmt(booking.startDate)} au ${fmt(booking.endDate)}.`,
+      `Bonjour, réservation confirmée le ${fmtDate(booking.startAt)} de ${fmtTime(booking.startAt)} à ${fmtTime(booking.endAt)}.`,
     ];
     if (booking.arrivalTime) parts.push(`Heure d'arrivée prévue : ${booking.arrivalTime}.`);
     if (booking.guestNote) parts.push(booking.guestNote);

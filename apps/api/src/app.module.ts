@@ -16,6 +16,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { DepositsModule } from './modules/deposits/deposits.module';
 import { MessagingModule } from './modules/messaging/messaging.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
+import { CommercialModule } from './modules/commercial/commercial.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     DepositsModule,
     MessagingModule,
     ReviewsModule,
+    CommercialModule,
   ],
   controllers: [HealthController],
 })

@@ -18,6 +18,12 @@ export class CreateReviewDto {
   @MaxLength(2000)
   comment?: string;
 
+  /** Critères évalués, texte libre (ex. "Propreté, conformité, accès"). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  criteria?: string;
+
   @IsOptional()
   @IsBoolean()
   isPublic?: boolean = true;

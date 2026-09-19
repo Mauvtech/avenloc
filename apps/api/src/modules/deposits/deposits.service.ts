@@ -81,7 +81,7 @@ export class DepositsService {
     if (!depositAmount || Number(depositAmount) <= 0) return;
 
     const daysUntilStart = Math.ceil(
-      (booking.startDate.getTime() - Date.now()) / 86_400_000,
+      (booking.startAt.getTime() - Date.now()) / 86_400_000,
     );
     if (daysUntilStart > DepositsService.HOLD_DAYS) return;
 
@@ -342,8 +342,8 @@ export class DepositsService {
     const bookings = await this.prisma.booking.findMany({
       where: {
         status: 'CONFIRMED',
-        startDate: { lte: horizon },
-        endDate: { gte: new Date() },
+        startAt: { lte: horizon },
+        endAt: { gte: new Date() },
         listing: { depositAmount: { gt: 0 } },
         deposit: null,
       },
@@ -418,7 +418,7 @@ export class DepositsService {
     const deposits = await this.prisma.deposit.findMany({
       where: {
         status: 'AUTHORIZED',
-        booking: { status: 'COMPLETED', endDate: { lte: cutoff } },
+        booking: { status: 'COMPLETED', endAt: { lte: cutoff } },
       },
     });
     for (const deposit of deposits) {

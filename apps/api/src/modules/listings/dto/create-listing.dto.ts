@@ -9,6 +9,7 @@ import {
   IsObject,
   IsLatitude,
   IsLongitude,
+  Matches,
   MinLength,
   MaxLength,
   Min,
@@ -20,7 +21,10 @@ import {
   ListingType,
   PricingUnit,
   CancellationPolicy,
+  AccessMethod,
 } from '@prisma/client';
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export class CreateListingDto {
   @IsEnum(ListingType)
@@ -114,4 +118,59 @@ export class CreateListingDto {
   @IsOptional()
   @IsObject()
   specificAttributes?: Record<string, unknown>;
+
+  // ── Créneaux horaires ──────────────────────────────────────────────────────
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(6, { each: true })
+  openDays?: number[];
+
+  @IsOptional()
+  @Matches(TIME_PATTERN)
+  openStartTime?: string;
+
+  @IsOptional()
+  @Matches(TIME_PATTERN)
+  openEndTime?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(15)
+  @Max(1440)
+  minDurationMinutes?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(720)
+  minNoticeHours?: number;
+
+  // ── Conditions d'accès et d'usage ────────────────────────────────────────────
+  @IsOptional()
+  @IsEnum(AccessMethod)
+  accessMethod?: AccessMethod;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  accessInstructions?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  activityValidationRequired?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  rcProRequired?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  houseRules?: string;
+
+  @IsOptional()
+  @IsString()
+  establishmentId?: string;
 }

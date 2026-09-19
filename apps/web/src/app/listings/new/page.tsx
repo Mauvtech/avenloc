@@ -6,21 +6,26 @@ import { api } from '@/lib/api';
 import { isAuthenticated, loginHref } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
 import AddressAutocomplete from '@/components/address-autocomplete';
+import ListingFaqEditor, { type FaqDraft } from '@/components/listing-faq-editor';
 import { BackLink, Stepper } from '@/components/ui';
 import { useToast } from '@/components/toast';
 import { eur } from '@/lib/format';
 import type { GeoResult } from '@/lib/geo';
 import {
+  ACCESS_METHOD_LABEL,
+  ACCESS_METHODS,
   CANCELLATION_LABEL,
   CANCELLATION_POLICIES,
   capacityNoun,
   LISTING_TYPES,
   PRICING_UNITS,
   UNIT_LABEL_SHORT,
+  WEEKDAY_LABEL,
   typeLabel,
 } from '@/lib/listing';
 
-const STEPS = ['Type & description', 'Localisation', 'Prix & détails', 'Photos'];
+const STEPS = ['Type & description', 'Localisation', 'Prix & détails', 'Conditions', 'Photos'];
+const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0];
 
 export default function NewListingPage() {
   const router = useRouter();
@@ -49,7 +54,18 @@ export default function NewListingPage() {
     cancellationPolicy: 'MODERATE',
     instantBookEnabled: false,
     amenities: '',
+    openStartTime: '08:00',
+    openEndTime: '19:00',
+    minDurationMinutes: '60',
+    minNoticeHours: '0',
+    accessMethod: '',
+    accessInstructions: '',
+    activityValidationRequired: false,
+    rcProRequired: false,
+    houseRules: '',
   });
+  const [openDays, setOpenDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [faqDraft, setFaqDraft] = useState<FaqDraft[]>([]);
 
   const [addressQuery, setAddressQuery] = useState('');
   const [geo, setGeo] = useState<GeoResult | null>(null);
@@ -89,6 +105,10 @@ export default function NewListingPage() {
       [next[i], next[t]] = [next[t], next[i]];
       return next;
     });
+  }
+
+  function toggleOpenDay(d: number) {
+    setOpenDays((days) => (days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort()));
   }
 
   function set(field: keyof typeof form) {
@@ -168,6 +188,16 @@ export default function NewListingPage() {
           .split(',')
           .map((a) => a.trim())
           .filter(Boolean),
+        openDays,
+        openStartTime: form.openStartTime,
+        openEndTime: form.openEndTime,
+        minDurationMinutes: parseInt(form.minDurationMinutes, 10) || 60,
+        minNoticeHours: parseInt(form.minNoticeHours, 10) || 0,
+        accessMethod: form.accessMethod || undefined,
+        accessInstructions: form.accessInstructions || undefined,
+        activityValidationRequired: form.activityValidationRequired,
+        rcProRequired: form.rcProRequired,
+        houseRules: form.houseRules || undefined,
       };
       const listing = await api.listings.create(payload);
       for (const file of photos) {
@@ -177,8 +207,15 @@ export default function NewListingPage() {
           /* non bloquant */
         }
       }
+      for (const item of faqDraft) {
+        try {
+          await api.listings.addFaqItem(listing.id, item);
+        } catch {
+          /* non bloquant */
+        }
+      }
       toast.success('Annonce créée en brouillon');
-      router.push(`/host?created=${listing.id}`);
+      router.push(`/host/spaces?created=${listing.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la création');
     } finally {
@@ -190,7 +227,7 @@ export default function NewListingPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <BackLink href="/host">Retour à mes annonces</BackLink>
+      <BackLink href="/host/spaces">Retour à mes annonces</BackLink>
       <h1 className="text-2xl font-extrabold">Nouvelle annonce</h1>
 
       <div className="overflow-x-auto pb-1">
@@ -213,8 +250,8 @@ export default function NewListingPage() {
                       onClick={() => setForm((f) => ({ ...f, type: t }))}
                       className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-colors ${
                         active
-                          ? 'border-brand bg-brand text-white'
-                          : 'border-line bg-surface text-muted hover:text-ink'
+                          ? 'border-ink bg-ink text-white'
+                          : 'border-line bg-surface text-ink hover:border-ink/40'
                       }`}
                     >
                       <CategoryIcon type={t} size={16} />
@@ -401,8 +438,131 @@ export default function NewListingPage() {
           </section>
         )}
 
-        {/* Étape 4 */}
+        {/* Étape 4 — Conditions */}
         {step === 3 && (
+          <section className="space-y-5">
+            <div>
+              <span className="label">Jours d&apos;ouverture</span>
+              <div className="flex flex-wrap gap-2">
+                {WEEKDAYS.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => toggleOpenDay(d)}
+                    className={`rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-colors ${
+                      openDays.includes(d)
+                        ? 'border-ink bg-ink text-white'
+                        : 'border-line bg-surface text-ink hover:border-ink/40'
+                    }`}
+                  >
+                    {WEEKDAY_LABEL[d]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <label className="label">Ouverture</label>
+                <input type="time" value={form.openStartTime} onChange={set('openStartTime')} className="field" />
+              </div>
+              <div>
+                <label className="label">Fermeture</label>
+                <input type="time" value={form.openEndTime} onChange={set('openEndTime')} className="field" />
+              </div>
+              <div>
+                <label className="label">Durée min. (min)</label>
+                <input
+                  type="number"
+                  min="15"
+                  step="15"
+                  value={form.minDurationMinutes}
+                  onChange={set('minDurationMinutes')}
+                  className="field"
+                />
+              </div>
+              <div>
+                <label className="label">Délai min. (h)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.minNoticeHours}
+                  onChange={set('minNoticeHours')}
+                  className="field"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="label">Méthode d&apos;accès</label>
+                <select value={form.accessMethod} onChange={set('accessMethod')} className="field">
+                  <option value="">Aucune / à définir</option>
+                  {ACCESS_METHODS.map((m) => (
+                    <option key={m} value={m}>
+                      {ACCESS_METHOD_LABEL[m]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">
+                  Instructions d&apos;accès <span className="font-normal">(révélées après confirmation)</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.accessInstructions}
+                  onChange={set('accessInstructions')}
+                  placeholder="Ex. Code porte 4821A"
+                  className="field"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.activityValidationRequired}
+                  onChange={set('activityValidationRequired')}
+                  className="accent-brand"
+                />
+                Valider manuellement l&apos;activité prévue par le locataire
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.rcProRequired}
+                  onChange={set('rcProRequired')}
+                  className="accent-brand"
+                />
+                Exiger une attestation RC Pro
+              </label>
+            </div>
+
+            <div>
+              <label className="label">Règlement intérieur</label>
+              <textarea
+                rows={3}
+                value={form.houseRules}
+                onChange={set('houseRules')}
+                className="field resize-y"
+                placeholder="Règles d'usage, consignes de nettoyage, ce qui est facturé sur la caution…"
+              />
+            </div>
+
+            <div>
+              <span className="label">FAQ</span>
+              <ListingFaqEditor
+                items={faqDraft}
+                onAdd={(item) => setFaqDraft((f) => [...f, item])}
+                onRemove={(_, i) => setFaqDraft((f) => f.filter((_, j) => j !== i))}
+              />
+            </div>
+          </section>
+        )}
+
+        {/* Étape 5 — Photos */}
+        {step === 4 && (
           <section className="space-y-5">
             <div className="space-y-3">
               <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line bg-canvas py-6 text-center text-sm text-muted transition-colors hover:border-brand hover:text-ink">

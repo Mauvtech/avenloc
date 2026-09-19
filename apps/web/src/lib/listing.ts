@@ -10,6 +10,10 @@ export const TYPE_LABEL: Record<string, string> = {
   WAREHOUSE: 'Entrepôt',
   EVENT_SPACE: 'Espace événementiel',
   PARKING: 'Parking',
+  SHOP: 'Boutique',
+  PRACTICE_ROOM: 'Cabinet',
+  RESTAURANT: 'Restaurant',
+  CREATIVE_STUDIO: 'Studio créatif',
   OTHER: 'Autre',
 };
 
@@ -25,6 +29,10 @@ export const BROWSE_TYPES = [
   'WORKSHOP',
   'WAREHOUSE',
   'PARKING',
+  'SHOP',
+  'PRACTICE_ROOM',
+  'RESTAURANT',
+  'CREATIVE_STUDIO',
 ];
 
 // Libellé de capacité adapté au type (une salle n'a pas de « locataires »).
@@ -35,6 +43,30 @@ const CAPACITY_NOUN: Record<string, string> = {
   WORKSHOP: 'personnes',
   WAREHOUSE: 'm² utiles',
   PARKING: 'véhicules',
+  SHOP: 'personnes',
+  PRACTICE_ROOM: 'personnes',
+  RESTAURANT: 'couverts',
+  CREATIVE_STUDIO: 'personnes',
+};
+
+export const ACCESS_METHOD_LABEL: Record<string, string> = {
+  CONNECTED_LOCK: 'Serrure connectée',
+  ACCESS_CODE: "Code d'accès",
+  KEY_BOX: 'Boîte à clés',
+  QR_CODE: 'QR code',
+  RECEPTION: 'Accueil sur place',
+};
+
+export const ACCESS_METHODS = Object.keys(ACCESS_METHOD_LABEL);
+
+export const WEEKDAY_LABEL: Record<number, string> = {
+  0: 'Dim',
+  1: 'Lun',
+  2: 'Mar',
+  3: 'Mer',
+  4: 'Jeu',
+  5: 'Ven',
+  6: 'Sam',
 };
 
 export function capacityNoun(type: string): string {

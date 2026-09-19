@@ -58,6 +58,13 @@ export class PaymentsController {
     res.redirect(`${this.config.get<string>('frontend.url') ?? 'http://localhost:3000'}/host/connect/return`);
   }
 
+  @Get('host-history')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('HOST')
+  getHostHistory(@CurrentUser() user: AuthenticatedUser) {
+    return this.paymentsService.getHostPaymentHistory(user.id);
+  }
+
   // ── PaymentIntent ────────────────────────────────────────────────────────────
 
   @Post('intent')

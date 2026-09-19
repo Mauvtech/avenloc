@@ -9,9 +9,20 @@ import { Prisma, BookingStatus, PricingUnit } from '@prisma/client';
 import { PrismaService } from '@/infrastructure/database/prisma.service';
 import { MessagingService } from '@/modules/messaging/messaging.service';
 import { PricingService } from './pricing.service';
+import { combineDateAndTime, assertWithinSchedule } from '@/modules/listings/availability-rules.util';
 import type { CreateBookingDto } from './dto/create-booking.dto';
 import type { QuoteResponseDto } from './dto/quote.dto';
 import type { AuthenticatedUser } from '@/modules/auth/strategies/jwt.strategy';
+
+/** unitCount facturé selon l'unité de tarification de l'annonce, à partir de la
+ * durée réelle du créneau — HOUR facture à l'heure entière supérieure, NIGHT/DAY
+ * à la journée entière supérieure (un créneau de plusieurs heures sur une annonce
+ * facturée à la nuit/jour reste compté comme 1 unité minimum). */
+function computeUnitCount(pricingUnit: PricingUnit, durationMs: number): number {
+  const hours = durationMs / 3_600_000;
+  if (pricingUnit === PricingUnit.HOUR) return Math.ceil(hours);
+  return Math.max(1, Math.ceil(hours / 24));
+}
 
 @Injectable()
 export class BookingsService {
@@ -24,22 +35,22 @@ export class BookingsService {
   /** Devis de prix (aucune réservation créée) — pour l'aperçu côté locataire. */
   async quote(dto: {
     listingId: string;
-    startDate: string;
-    endDate: string;
+    date: string;
+    startTime: string;
+    endTime: string;
   }): Promise<QuoteResponseDto> {
     const listing = await this.prisma.listing.findUnique({
       where: { id: dto.listingId },
     });
     if (!listing) throw new NotFoundException('Annonce introuvable');
 
-    const start = new Date(dto.startDate);
-    const end = new Date(dto.endDate);
+    const start = combineDateAndTime(dto.date, dto.startTime);
+    const end = combineDateAndTime(dto.date, dto.endTime);
     if (start >= end) {
-      throw new BadRequestException('La date de fin doit être postérieure à la date de début');
+      throw new BadRequestException("L'heure de fin doit être postérieure à l'heure de début");
     }
 
-    const days = Math.round((end.getTime() - start.getTime()) / 86_400_000);
-    const unitCount = days;
+    const unitCount = computeUnitCount(listing.pricingUnit, end.getTime() - start.getTime());
     if (unitCount <= 0) throw new BadRequestException('Durée invalide');
 
     const p = await this.pricingService.calculate(listing, unitCount);
@@ -64,16 +75,12 @@ export class BookingsService {
       throw new NotFoundException('Annonce introuvable ou non publiée');
     }
 
-    const start = new Date(dto.startDate);
-    const end = new Date(dto.endDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const start = combineDateAndTime(dto.date, dto.startTime);
+    const end = combineDateAndTime(dto.date, dto.endTime);
+    const now = new Date();
 
-    if (start < today) {
-      throw new BadRequestException('La date de début ne peut pas être dans le passé');
-    }
     if (start >= end) {
-      throw new BadRequestException('La date de fin doit être postérieure à la date de début');
+      throw new BadRequestException("L'heure de fin doit être postérieure à l'heure de début");
     }
 
     if (listing.maxGuests !== null && dto.guestCount > listing.maxGuests) {
@@ -82,21 +89,19 @@ export class BookingsService {
       );
     }
 
-    // Calculate unitCount based on pricingUnit
-    const diffMs = end.getTime() - start.getTime();
-    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-    let unitCount: number;
-    switch (listing.pricingUnit) {
-      case PricingUnit.NIGHT:
-      case PricingUnit.DAY:
-        unitCount = diffDays;
-        break;
-      case PricingUnit.HOUR:
-        // For hourly, MVP treats as days (full-day hourly blocks not supported at booking level)
-        unitCount = diffDays;
-        break;
+    assertWithinSchedule(listing, start, end, now);
+
+    if (listing.activityValidationRequired && !dto.activityDescription?.trim()) {
+      throw new BadRequestException("Merci de décrire l'activité prévue pour cette réservation");
+    }
+    if (listing.rcProRequired && !dto.rcProAccepted) {
+      throw new BadRequestException('Une attestation RC Pro est requise pour réserver cette annonce');
+    }
+    if (!dto.houseRulesAccepted) {
+      throw new BadRequestException("Merci d'accepter le règlement intérieur de l'annonce");
     }
 
+    const unitCount = computeUnitCount(listing.pricingUnit, end.getTime() - start.getTime());
     if (unitCount <= 0) {
       throw new BadRequestException('Durée de réservation invalide');
     }
@@ -119,28 +124,26 @@ export class BookingsService {
             listingId: listing.id,
             status: { in: ['PENDING', 'CONFIRMED'] },
             AND: [
-              { startDate: { lt: end } },
-              { endDate: { gt: start } },
+              { startAt: { lt: end } },
+              { endAt: { gt: start } },
             ],
           },
         });
 
         if (overlap) {
-          throw new ConflictException('Ces dates ne sont plus disponibles');
+          throw new ConflictException('Ce créneau vient d\'être réservé par quelqu\'un d\'autre');
         }
 
-        // Jours bloqués par l'hôte (calendrier de disponibilité)
+        // Créneaux bloqués par l'hôte (exceptions/fermetures ponctuelles)
         const blocked = await tx.listingAvailability.findFirst({
           where: {
             listingId: listing.id,
             isAvailable: false,
-            AND: [{ startDate: { lt: end } }, { endDate: { gt: start } }],
+            AND: [{ startAt: { lt: end } }, { endAt: { gt: start } }],
           },
         });
         if (blocked) {
-          throw new ConflictException(
-            "L'hôte a rendu une ou plusieurs de ces dates indisponibles",
-          );
+          throw new ConflictException("L'hôte a fermé ce créneau");
         }
 
         const hostApprovalDeadline = listing.instantBookEnabled
@@ -152,12 +155,15 @@ export class BookingsService {
             listingId: listing.id,
             tenantId: currentUser.id,
             status: listing.instantBookEnabled ? BookingStatus.CONFIRMED : BookingStatus.PENDING,
-            startDate: start,
-            endDate: end,
+            startAt: start,
+            endAt: end,
             unitCount,
             guestCount: dto.guestCount,
             guestNote: dto.guestNote,
             arrivalTime: dto.arrivalTime,
+            activityDescription: dto.activityDescription,
+            rcProAccepted: dto.rcProAccepted ?? false,
+            houseRulesAccepted: dto.houseRulesAccepted,
             baseAmount: pricing.baseAmount,
             cleaningFee: pricing.cleaningFee,
             serviceFee: pricing.serviceFee,

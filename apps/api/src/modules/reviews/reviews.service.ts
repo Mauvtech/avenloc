@@ -45,6 +45,7 @@ export class ReviewsService {
           target: dto.target,
           rating: dto.rating,
           comment: dto.comment ?? null,
+          criteria: dto.criteria ?? null,
           isPublic: dto.isPublic ?? true,
           listingId: dto.target === ReviewTarget.LISTING ? booking.listing.id : null,
           tenantSubjectId: dto.target === ReviewTarget.TENANT ? booking.tenantId : null,
@@ -62,6 +63,7 @@ export class ReviewsService {
         target: review.target,
         rating: review.rating,
         comment: review.comment,
+        criteria: review.criteria,
         isPublic: review.isPublic,
         listingId: review.listingId,
         tenantSubjectId: review.tenantSubjectId,
@@ -112,6 +114,7 @@ export class ReviewsService {
         target: r.target,
         rating: r.rating,
         comment: r.comment,
+        criteria: r.criteria,
         isPublic: r.isPublic,
         listingId: r.listingId,
         tenantSubjectId: r.tenantSubjectId,
@@ -120,6 +123,31 @@ export class ReviewsService {
       averageRating: aggregate._avg.rating,
       total,
     };
+  }
+
+  /** Tous les avis reçus sur les annonces d'un hôte — onglet Avis du dashboard. */
+  async findByHost(hostId: string): Promise<ReviewResponseDto[]> {
+    const reviews = await this.prisma.review.findMany({
+      where: { target: ReviewTarget.LISTING, isPublic: true, listing: { hostId } },
+      include: { author: { select: { firstName: true } }, listing: { select: { title: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return reviews.map((r) => ({
+      id: r.id,
+      bookingId: r.bookingId,
+      authorId: r.authorId,
+      authorFirstName: r.author.firstName,
+      target: r.target,
+      rating: r.rating,
+      comment: r.comment,
+      criteria: r.criteria,
+      isPublic: r.isPublic,
+      listingId: r.listingId,
+      tenantSubjectId: r.tenantSubjectId,
+      createdAt: r.createdAt,
+      listingTitle: r.listing?.title,
+    }));
   }
 
   async findByUser(
@@ -143,6 +171,7 @@ export class ReviewsService {
       target: r.target,
       rating: r.rating,
       comment: r.comment,
+      criteria: r.criteria,
       isPublic: r.isPublic,
       listingId: r.listingId,
       tenantSubjectId: r.tenantSubjectId,

@@ -8,9 +8,12 @@ export class ReviewResponseDto {
   target: ReviewTarget = 'LISTING';
   rating: number = 5;
   comment: string | null = null;
+  criteria: string | null = null;
   isPublic: boolean = true;
   listingId: string | null = null;
   tenantSubjectId: string | null = null;
+  /** Renseigné uniquement par ReviewsService.findByHost() (vue groupée par annonce). */
+  listingTitle?: string;
   createdAt: Date = new Date();
 }
 

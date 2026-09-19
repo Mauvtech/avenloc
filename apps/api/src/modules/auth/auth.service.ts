@@ -205,6 +205,12 @@ export class AuthService {
     return this.generateTokens(user);
   }
 
+  /** Émet une paire de tokens pour un utilisateur déjà authentifié par un autre
+   * moyen (ex. activation de compte via une invitation commerciale). */
+  async issueTokens(user: User): Promise<TokenResponseDto> {
+    return this.generateTokens(user);
+  }
+
   private async generateTokens(user: User): Promise<TokenResponseDto> {
     const payload: JwtPayload = {
       sub: user.id,

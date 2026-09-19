@@ -36,3 +36,24 @@ export function dateLong(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : DATE_LONG.format(d);
 }
+
+// Le back ne fait aucune conversion de fuseau (une heure "14:00" saisie est
+// stockée comme l'instant UTC 14:00:00Z) — formater ces valeurs avec le fuseau
+// du navigateur décalerait l'heure affichée. timeLabel()/dateLongUTC() forcent
+// l'UTC pour rester cohérents avec ce qui a été saisi.
+const DATE_LONG_UTC = new Intl.DateTimeFormat('fr-FR', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
+export function dateLongUTC(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : DATE_LONG_UTC.format(d);
+}
+
+/** "HH:mm" extrait directement de l'ISO — voir note ci-dessus. */
+export function timeLabel(iso: string): string {
+  return iso.slice(11, 16);
+}

@@ -54,8 +54,8 @@ export function computeHostStats(bookings: Booking[]): HostStats {
 
   for (const b of bookings) {
     const net = netAmount(b);
-    const start = new Date(b.startDate);
-    const end = new Date(b.endDate);
+    const start = new Date(b.startAt);
+    const end = new Date(b.endAt);
     const nights = Math.max(
       1,
       Math.round((end.getTime() - start.getTime()) / 86_400_000),

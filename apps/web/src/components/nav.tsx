@@ -14,7 +14,7 @@ function Logo() {
       <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-[15px] font-extrabold text-white shadow-xs">
         A
       </span>
-      <span className="text-[17px] font-extrabold tracking-tight">Aven</span>
+      <span className="font-display text-[18px] font-bold tracking-tight">Aven</span>
     </Link>
   );
 }
@@ -22,7 +22,7 @@ function Logo() {
 interface LinkDef {
   href: string;
   label: string;
-  hostOnly?: boolean;
+  requiresRole?: 'HOST' | 'COMMERCIAL';
   badge?: number;
 }
 
@@ -113,13 +113,15 @@ export default function Nav() {
   const isActive = (href: string) =>
     pathname === href || (href !== '/' && pathname.startsWith(href));
 
+  const allLinks: LinkDef[] = [
+    { href: '/host', label: 'Espace hôte', requiresRole: 'HOST' },
+    { href: '/commercial', label: 'Espace commercial', requiresRole: 'COMMERCIAL' },
+    { href: '/wishlist', label: 'Favoris' },
+    { href: '/bookings', label: 'Réservations' },
+    { href: '/conversations', label: 'Messages', badge: unread },
+  ];
   const links: LinkDef[] = user
-    ? [
-        { href: '/host', label: 'Espace hôte', hostOnly: true },
-        { href: '/wishlist', label: 'Favoris' },
-        { href: '/bookings', label: 'Réservations' },
-        { href: '/conversations', label: 'Messages', badge: unread },
-      ].filter((l) => !l.hostOnly || user.roles.includes('HOST'))
+    ? allLinks.filter((l) => !l.requiresRole || user.roles.includes(l.requiresRole))
     : [];
 
   const NavLink = ({ href, label, badge }: LinkDef) => (
@@ -168,9 +170,11 @@ export default function Nav() {
                       <p className="truncate text-xs text-muted">{user.email}</p>
                     </div>
                     <MenuItem href="/profile" label="Mon profil" />
-                    {user.roles.includes('HOST') ? (
-                      <MenuItem href="/host" label="Espace hôte" />
-                    ) : (
+                    {user.roles.includes('HOST') && <MenuItem href="/host" label="Espace hôte" />}
+                    {user.roles.includes('COMMERCIAL') && (
+                      <MenuItem href="/commercial" label="Espace commercial" />
+                    )}
+                    {!user.roles.includes('HOST') && (
                       <MenuItem href="/listings/new" label="Publier un espace" />
                     )}
                     <button

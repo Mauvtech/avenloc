@@ -15,12 +15,20 @@ import type { AuthenticatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import type { CreateListingDto } from './dto/create-listing.dto';
 import type { UpdateListingDto } from './dto/update-listing.dto';
 import type { CreateAvailabilityDto } from './dto/availability.dto';
+import type { CreateFaqItemDto, UpdateFaqItemDto } from './dto/faq.dto';
 import type { ListingResponseDto } from './dto/listing-response.dto';
-import type { Listing, ListingAvailability, ListingPhoto } from '@prisma/client';
+import {
+  combineDateAndTime,
+  generateDaySlots,
+  markUnavailable,
+  type Slot,
+} from './availability-rules.util';
+import type { Listing, ListingAvailability, ListingFaqItem, ListingPhoto } from '@prisma/client';
 
 type ListingWithRelations = Listing & {
   photos: ListingPhoto[];
   availabilities?: ListingAvailability[];
+  faqItems?: ListingFaqItem[];
   host?:
     | {
         stripeAccountStatus: string | null;
@@ -70,6 +78,17 @@ export class ListingsService {
         instantBookEnabled: dto.instantBookEnabled ?? false,
         amenities: dto.amenities ?? [],
         specificAttributes: dto.specificAttributes as Prisma.InputJsonValue ?? Prisma.JsonNull,
+        ...(dto.openDays !== undefined && { openDays: dto.openDays }),
+        ...(dto.openStartTime !== undefined && { openStartTime: dto.openStartTime }),
+        ...(dto.openEndTime !== undefined && { openEndTime: dto.openEndTime }),
+        ...(dto.minDurationMinutes !== undefined && { minDurationMinutes: dto.minDurationMinutes }),
+        ...(dto.minNoticeHours !== undefined && { minNoticeHours: dto.minNoticeHours }),
+        accessMethod: dto.accessMethod,
+        accessInstructions: dto.accessInstructions,
+        activityValidationRequired: dto.activityValidationRequired ?? false,
+        rcProRequired: dto.rcProRequired ?? false,
+        houseRules: dto.houseRules,
+        establishmentId: dto.establishmentId,
       },
       include: { photos: true },
     });
@@ -83,6 +102,7 @@ export class ListingsService {
       include: {
         photos: { orderBy: { position: 'asc' } },
         availabilities: true,
+        faqItems: { orderBy: { position: 'asc' } },
         host: {
           select: {
             id: true,
@@ -162,8 +182,20 @@ export class ListingsService {
         ...(dto.instantBookEnabled !== undefined && { instantBookEnabled: dto.instantBookEnabled }),
         ...(dto.amenities !== undefined && { amenities: dto.amenities }),
         ...(dto.specificAttributes !== undefined && { specificAttributes: dto.specificAttributes as Prisma.InputJsonValue }),
+        ...(dto.openDays !== undefined && { openDays: dto.openDays }),
+        ...(dto.openStartTime !== undefined && { openStartTime: dto.openStartTime }),
+        ...(dto.openEndTime !== undefined && { openEndTime: dto.openEndTime }),
+        ...(dto.minDurationMinutes !== undefined && { minDurationMinutes: dto.minDurationMinutes }),
+        ...(dto.minNoticeHours !== undefined && { minNoticeHours: dto.minNoticeHours }),
+        ...(dto.accessMethod !== undefined && { accessMethod: dto.accessMethod }),
+        ...(dto.accessInstructions !== undefined && { accessInstructions: dto.accessInstructions }),
+        ...(dto.activityValidationRequired !== undefined && {
+          activityValidationRequired: dto.activityValidationRequired,
+        }),
+        ...(dto.rcProRequired !== undefined && { rcProRequired: dto.rcProRequired }),
+        ...(dto.houseRules !== undefined && { houseRules: dto.houseRules }),
       },
-      include: { photos: { orderBy: { position: 'asc' } } },
+      include: { photos: { orderBy: { position: 'asc' } }, faqItems: { orderBy: { position: 'asc' } } },
     });
 
     return this.toResponseDto(updated);
@@ -265,13 +297,13 @@ export class ListingsService {
   async getAvailabilities(listingId: string): Promise<ListingAvailability[]> {
     return this.prisma.listingAvailability.findMany({
       where: { listingId },
-      orderBy: { startDate: 'asc' },
+      orderBy: { startAt: 'asc' },
     });
   }
 
   /**
-   * Plages de dates indisponibles pour un locataire : jours bloqués par l'hôte
-   * + réservations actives. `end` exclusif. Format ISO (YYYY-MM-DD).
+   * Plages horodatées indisponibles pour un locataire : créneaux bloqués par
+   * l'hôte + réservations actives. `end` exclusif, format ISO complet.
    */
   async getUnavailableRanges(
     listingId: string,
@@ -279,17 +311,44 @@ export class ListingsService {
     const [blocks, bookings] = await Promise.all([
       this.prisma.listingAvailability.findMany({
         where: { listingId, isAvailable: false },
-        select: { startDate: true, endDate: true },
+        select: { startAt: true, endAt: true },
       }),
       this.prisma.booking.findMany({
         where: { listingId, status: { in: ['PENDING', 'CONFIRMED'] } },
-        select: { startDate: true, endDate: true },
+        select: { startAt: true, endAt: true },
       }),
     ]);
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
     return [...blocks, ...bookings]
-      .map((r) => ({ start: iso(r.startDate), end: iso(r.endDate) }))
+      .map((r) => ({ start: r.startAt.toISOString(), end: r.endAt.toISOString() }))
       .sort((a, b) => a.start.localeCompare(b.start));
+  }
+
+  /** Grille de créneaux réservables d'une journée donnée pour une annonce (public). */
+  async getSlots(listingId: string, date: string): Promise<Slot[]> {
+    const listing = await this.prisma.listing.findUnique({ where: { id: listingId } });
+    if (!listing) throw new NotFoundException('Annonce introuvable');
+
+    const dayStart = new Date(`${date}T00:00:00.000Z`);
+    const dayEnd = new Date(dayStart.getTime() + 24 * 3600 * 1000);
+
+    const [bookings, blocks] = await Promise.all([
+      this.prisma.booking.findMany({
+        where: {
+          listingId,
+          status: { in: ['PENDING', 'CONFIRMED'] },
+          startAt: { lt: dayEnd },
+          endAt: { gt: dayStart },
+        },
+        select: { startAt: true, endAt: true },
+      }),
+      this.prisma.listingAvailability.findMany({
+        where: { listingId, isAvailable: false, startAt: { lt: dayEnd }, endAt: { gt: dayStart } },
+        select: { startAt: true, endAt: true },
+      }),
+    ]);
+
+    const slots = generateDaySlots(listing, date);
+    return markUnavailable(slots, [...bookings, ...blocks]);
   }
 
   async addAvailability(
@@ -299,37 +358,88 @@ export class ListingsService {
   ): Promise<ListingAvailability> {
     await this.findAndVerifyOwnership(listingId, currentUser);
 
-    const start = new Date(dto.startDate);
-    const end = new Date(dto.endDate);
+    const dayStart = new Date(`${dto.date}T00:00:00.000Z`);
+    const start = dto.startTime ? combineDateAndTime(dto.date, dto.startTime) : dayStart;
+    const end = dto.endTime
+      ? combineDateAndTime(dto.date, dto.endTime)
+      : new Date(dayStart.getTime() + 24 * 3600 * 1000);
 
     if (end <= start) {
-      throw new BadRequestException('endDate doit être postérieure à startDate');
+      throw new BadRequestException('endTime doit être postérieure à startTime');
     }
 
     const isAvailable = dto.isAvailable ?? true;
 
-    // On ne compare qu'aux plages de MÊME nature : un jour bloqué peut tout à fait
+    // On ne compare qu'aux plages de MÊME nature : un créneau bloqué peut tout à fait
     // se situer à l'intérieur d'une fenêtre "disponible" (c'est le but).
     const overlapping = await this.prisma.listingAvailability.findFirst({
       where: {
         listingId,
         isAvailable,
-        startDate: { lt: end },
-        endDate: { gt: start },
+        startAt: { lt: end },
+        endAt: { gt: start },
       },
     });
 
     if (overlapping) {
       // Plage déjà couverte → idempotent (double-clic, état obsolète côté client).
-      if (overlapping.startDate <= start && overlapping.endDate >= end) {
+      if (overlapping.startAt <= start && overlapping.endAt >= end) {
         return overlapping;
       }
       throw new ConflictException('Cette plage chevauche une disponibilité existante');
     }
 
     return this.prisma.listingAvailability.create({
-      data: { listingId, startDate: start, endDate: end, isAvailable },
+      data: { listingId, startAt: start, endAt: end, isAvailable },
     });
+  }
+
+  async addFaqItem(
+    listingId: string,
+    dto: CreateFaqItemDto,
+    currentUser: AuthenticatedUser,
+  ): Promise<ListingFaqItem> {
+    await this.findAndVerifyOwnership(listingId, currentUser);
+    const count = await this.prisma.listingFaqItem.count({ where: { listingId } });
+    return this.prisma.listingFaqItem.create({
+      data: {
+        listingId,
+        question: dto.question,
+        answer: dto.answer,
+        position: dto.position ?? count,
+      },
+    });
+  }
+
+  async updateFaqItem(
+    listingId: string,
+    faqId: string,
+    dto: UpdateFaqItemDto,
+    currentUser: AuthenticatedUser,
+  ): Promise<ListingFaqItem> {
+    await this.findAndVerifyOwnership(listingId, currentUser);
+    const item = await this.prisma.listingFaqItem.findUnique({ where: { id: faqId } });
+    if (!item || item.listingId !== listingId) throw new NotFoundException('Question introuvable');
+
+    return this.prisma.listingFaqItem.update({
+      where: { id: faqId },
+      data: {
+        ...(dto.question !== undefined && { question: dto.question }),
+        ...(dto.answer !== undefined && { answer: dto.answer }),
+        ...(dto.position !== undefined && { position: dto.position }),
+      },
+    });
+  }
+
+  async deleteFaqItem(
+    listingId: string,
+    faqId: string,
+    currentUser: AuthenticatedUser,
+  ): Promise<void> {
+    await this.findAndVerifyOwnership(listingId, currentUser);
+    const item = await this.prisma.listingFaqItem.findUnique({ where: { id: faqId } });
+    if (!item || item.listingId !== listingId) throw new NotFoundException('Question introuvable');
+    await this.prisma.listingFaqItem.delete({ where: { id: faqId } });
   }
 
   async deleteAvailability(
@@ -384,10 +494,22 @@ export class ListingsService {
       instantBookEnabled: listing.instantBookEnabled,
       amenities: listing.amenities,
       specificAttributes: listing.specificAttributes,
+      openDays: listing.openDays,
+      openStartTime: listing.openStartTime,
+      openEndTime: listing.openEndTime,
+      minDurationMinutes: listing.minDurationMinutes,
+      minNoticeHours: listing.minNoticeHours,
+      accessMethod: listing.accessMethod,
+      accessInstructions: listing.accessInstructions,
+      activityValidationRequired: listing.activityValidationRequired,
+      rcProRequired: listing.rcProRequired,
+      houseRules: listing.houseRules,
+      establishmentId: listing.establishmentId,
       createdAt: listing.createdAt,
       updatedAt: listing.updatedAt,
       photos: listing.photos,
       availabilities: listing.availabilities,
+      faqItems: listing.faqItems,
       // L'hôte a-t-il finalisé son encaissement ? (ou flag démo « simulatePayments »)
       hostPaymentsReady:
         this.features.isOn('simulatePayments') ||

@@ -25,12 +25,12 @@ export default function ListingCalendarPage() {
     Promise.all([api.auth.me(), api.listings.getById(id)])
       .then(([me, l]) => {
         if (l.hostId !== me.id) {
-          router.replace('/host');
+          router.replace('/host/spaces');
           return;
         }
         setListing(l);
       })
-      .catch(() => router.replace('/host'))
+      .catch(() => router.replace('/host/spaces'))
       .finally(() => setLoading(false));
   }, [id, router]);
 
@@ -39,7 +39,7 @@ export default function ListingCalendarPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
-      <Link href="/host" className="text-sm text-muted hover:text-ink">
+      <Link href="/host/spaces" className="text-sm text-muted hover:text-ink">
         ← Mes annonces
       </Link>
       <div>

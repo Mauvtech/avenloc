@@ -10,6 +10,7 @@ import { PricingService } from './pricing.service';
 import { PrismaService } from '@/infrastructure/database/prisma.service';
 import { MessagingService } from '@/modules/messaging/messaging.service';
 import type { AuthenticatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import type { CreateBookingDto } from './dto/create-booking.dto';
 
 const mockTenant: AuthenticatedUser = {
   id: 'tenant-id',
@@ -19,29 +20,35 @@ const mockTenant: AuthenticatedUser = {
 
 const tomorrow = new Date();
 tomorrow.setDate(tomorrow.getDate() + 1);
-const dayAfter = new Date();
-dayAfter.setDate(dayAfter.getDate() + 3);
+const tomorrowDate = tomorrow.toISOString().split('T')[0];
 
 const mockListing = {
   id: 'listing-id',
   hostId: 'host-id',
   status: 'PUBLISHED',
   title: 'Test Listing',
-  pricingUnit: 'NIGHT',
-  basePrice: new Decimal(100),
-  cleaningFee: new Decimal(20),
+  pricingUnit: 'HOUR',
+  basePrice: new Decimal(20),
+  cleaningFee: new Decimal(0),
   serviceFeeRateOverride: null,
   maxGuests: 4,
   instantBookEnabled: true,
+  openDays: [0, 1, 2, 3, 4, 5, 6],
+  openStartTime: '00:00',
+  openEndTime: '23:59',
+  minDurationMinutes: 60,
+  minNoticeHours: 0,
+  activityValidationRequired: false,
+  rcProRequired: false,
 };
 
 const mockPricing = {
   unitCount: 2,
-  baseAmount: new Decimal(200),
-  cleaningFee: new Decimal(20),
-  serviceFee: new Decimal(26.4),
-  taxAmount: new Decimal(49.28),
-  totalAmount: new Decimal(295.68),
+  baseAmount: new Decimal(40),
+  cleaningFee: new Decimal(0),
+  serviceFee: new Decimal(4.8),
+  taxAmount: new Decimal(8.96),
+  totalAmount: new Decimal(53.76),
   effectiveServiceFeeRate: new Decimal(0.12),
 };
 
@@ -92,11 +99,13 @@ describe('BookingsService', () => {
   afterEach(() => jest.clearAllMocks());
 
   describe('create', () => {
-    const dto = {
+    const dto: CreateBookingDto = {
       listingId: 'listing-id',
-      startDate: tomorrow.toISOString().split('T')[0],
-      endDate: dayAfter.toISOString().split('T')[0],
+      date: tomorrowDate,
+      startTime: '10:00',
+      endTime: '12:00',
       guestCount: 2,
+      houseRulesAccepted: true,
     };
 
     it('creates confirmed booking for instant-book listing', async () => {
@@ -135,26 +144,21 @@ describe('BookingsService', () => {
       await expect(service.create(dto, mockTenant)).rejects.toThrow(NotFoundException);
     });
 
-    it('throws BadRequestException when startDate is in the past', async () => {
+    it('throws BadRequestException when the slot is in the past', async () => {
       prisma.listing.findUnique.mockResolvedValue(mockListing);
-      const pastDto = {
-        ...dto,
-        startDate: '2020-01-01',
-        endDate: '2020-01-05',
-      };
+      const pastDto = { ...dto, date: '2020-01-01' };
 
       await expect(service.create(pastDto, mockTenant)).rejects.toThrow(BadRequestException);
     });
 
-    it('throws BadRequestException when startDate >= endDate', async () => {
+    it('throws BadRequestException when startTime >= endTime', async () => {
       prisma.listing.findUnique.mockResolvedValue(mockListing);
-      const sameDay = tomorrow.toISOString().split('T')[0];
-      const badDto = { ...dto, startDate: sameDay, endDate: sameDay };
+      const badDto = { ...dto, startTime: '10:00', endTime: '10:00' };
 
       await expect(service.create(badDto, mockTenant)).rejects.toThrow(BadRequestException);
     });
 
-    it('throws ConflictException when dates overlap existing booking', async () => {
+    it('throws ConflictException when the slot overlaps an existing booking', async () => {
       prisma.listing.findUnique.mockResolvedValue(mockListing);
       prisma.$transaction.mockImplementation(async (fn: (tx: typeof prisma) => Promise<unknown>) => {
         prisma.$queryRaw.mockResolvedValue([]);

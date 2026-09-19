@@ -1,11 +1,19 @@
-import { IsDateString, IsBoolean, IsOptional, IsEnum } from 'class-validator';
+import { IsDateString, IsBoolean, IsOptional, IsEnum, Matches } from 'class-validator';
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export class CreateAvailabilityDto {
   @IsDateString()
-  startDate: string = '';
+  date: string = '';
 
-  @IsDateString()
-  endDate: string = '';
+  /** Omis = bloque/débloque la journée entière. */
+  @IsOptional()
+  @Matches(TIME_PATTERN)
+  startTime?: string;
+
+  @IsOptional()
+  @Matches(TIME_PATTERN)
+  endTime?: string;
 
   @IsOptional()
   @IsBoolean()

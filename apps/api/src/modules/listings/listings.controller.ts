@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -19,14 +20,16 @@ import { ListingsService } from './listings.service';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { CreateAvailabilityDto, UpdateListingStatusDto } from './dto/availability.dto';
+import { CreateFaqItemDto, UpdateFaqItemDto } from './dto/faq.dto';
 import { ReorderPhotosDto } from './dto/reorder-photos.dto';
 import type { ListingResponseDto } from './dto/listing-response.dto';
+import type { Slot } from './availability-rules.util';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/common/guards/roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import type { ListingAvailability, ListingPhoto } from '@prisma/client';
+import type { ListingAvailability, ListingFaqItem, ListingPhoto } from '@prisma/client';
 import type { Express } from 'express';
 
 @Controller('listings')
@@ -154,5 +157,44 @@ export class ListingsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<void> {
     return this.listingsService.deleteAvailability(id, availId, user);
+  }
+
+  // Public : grille de créneaux réservables d'une journée, pour le sélecteur de la fiche annonce.
+  @Get(':id/slots')
+  getSlots(@Param('id') id: string, @Query('date') date: string): Promise<Slot[]> {
+    return this.listingsService.getSlots(id, date);
+  }
+
+  @Post(':id/faq')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  addFaqItem(
+    @Param('id') id: string,
+    @Body() dto: CreateFaqItemDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ListingFaqItem> {
+    return this.listingsService.addFaqItem(id, dto, user);
+  }
+
+  @Patch(':id/faq/:faqId')
+  @UseGuards(JwtAuthGuard)
+  updateFaqItem(
+    @Param('id') id: string,
+    @Param('faqId') faqId: string,
+    @Body() dto: UpdateFaqItemDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ListingFaqItem> {
+    return this.listingsService.updateFaqItem(id, faqId, dto, user);
+  }
+
+  @Delete(':id/faq/:faqId')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteFaqItem(
+    @Param('id') id: string,
+    @Param('faqId') faqId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<void> {
+    return this.listingsService.deleteFaqItem(id, faqId, user);
   }
 }

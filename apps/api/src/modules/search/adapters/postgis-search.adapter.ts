@@ -80,7 +80,10 @@ export class PostgisSearchAdapter implements SearchEnginePort {
         ? Prisma.sql`AND l.amenities @> ${filters.amenities}::text[]`
         : Prisma.empty;
 
-    // Exclut les annonces déjà réservées OU dont l'hôte a bloqué la plage demandée
+    // Exclut les annonces déjà réservées OU dont l'hôte a bloqué le(s) jour(s)
+    // demandé(s). La recherche filtre par jour calendaire uniquement (comme le
+    // prototype) — la validation fine du créneau horaire se fait sur la fiche
+    // annonce via GET /listings/:id/slots, pas au niveau recherche.
     const dateClause =
       filters.startDate && filters.endDate
         ? Prisma.sql`
@@ -88,15 +91,15 @@ export class PostgisSearchAdapter implements SearchEnginePort {
               SELECT 1 FROM "Booking" b
               WHERE b."listingId" = l.id
                 AND b.status IN ('PENDING', 'CONFIRMED')
-                AND daterange(b."startDate"::date, b."endDate"::date, '[)') &&
-                    daterange(${filters.startDate}::date, ${filters.endDate}::date, '[)')
+                AND tstzrange(b."startAt", b."endAt", '[)') &&
+                    tstzrange(${filters.startDate}::date::timestamptz, (${filters.endDate}::date + interval '1 day')::timestamptz, '[)')
             )
             AND NOT EXISTS (
               SELECT 1 FROM "ListingAvailability" a
               WHERE a."listingId" = l.id
                 AND a."isAvailable" = false
-                AND daterange(a."startDate"::date, a."endDate"::date, '[)') &&
-                    daterange(${filters.startDate}::date, ${filters.endDate}::date, '[)')
+                AND tstzrange(a."startAt", a."endAt", '[)') &&
+                    tstzrange(${filters.startDate}::date::timestamptz, (${filters.endDate}::date + interval '1 day')::timestamptz, '[)')
             )`
         : Prisma.empty;
 

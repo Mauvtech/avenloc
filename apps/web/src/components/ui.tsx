@@ -34,7 +34,7 @@ export function EmptyState({
 }) {
   return (
     <div className="card flex flex-col items-center gap-3 px-6 py-14 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-tint text-lg text-brand-fg">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-canvas text-lg text-ink">
         {icon}
       </div>
       <div>
@@ -113,7 +113,7 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
                 state === 'done'
                   ? 'bg-success text-white'
                   : state === 'current'
-                    ? 'bg-brand text-white'
+                    ? 'bg-ink text-white'
                     : 'bg-canvas text-muted'
               }`}
             >

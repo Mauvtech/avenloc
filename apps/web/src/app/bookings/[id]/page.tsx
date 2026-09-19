@@ -8,10 +8,11 @@ import { isAuthenticated, loginHref } from '@/lib/auth';
 import CategoryIcon from '@/components/category-icon';
 import StripePayment from '@/components/stripe-payment';
 import DepositCard from '@/components/deposit-card';
+import AccessMethodBlock from '@/components/access-method-block';
 import { useToast } from '@/components/toast';
 import { useConfirm } from '@/components/confirm';
 import { BackLink, PageLoader, StarRating, Stepper } from '@/components/ui';
-import { dateLong, eur } from '@/lib/format';
+import { dateLongUTC, eur, timeLabel } from '@/lib/format';
 import { typeLabel } from '@/lib/listing';
 import type { Booking, Listing } from '@/lib/types';
 
@@ -43,7 +44,7 @@ export default function BookingDetailPage() {
   const [loading, setLoading] = useState(true);
   const [payLoading, setPayLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
+  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '', criteria: '' });
   const [reviewSent, setReviewSent] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
 
@@ -114,6 +115,7 @@ export default function BookingDetailPage() {
         target: 'LISTING',
         rating: reviewForm.rating,
         comment: reviewForm.comment || undefined,
+        criteria: reviewForm.criteria || undefined,
         listingId: booking.listingId,
       });
       setReviewSent(true);
@@ -178,10 +180,11 @@ export default function BookingDetailPage() {
       {/* Détails */}
       <div className="card space-y-3 p-6">
         <div className="space-y-2 text-sm">
-          <Row k="Arrivée" v={dateLong(booking.startDate)} />
-          <Row k="Départ" v={dateLong(booking.endDate)} />
+          <Row k="Date" v={dateLongUTC(booking.startAt)} />
+          <Row k="Créneau" v={`${timeLabel(booking.startAt)} – ${timeLabel(booking.endAt)}`} />
           {booking.arrivalTime && <Row k="Heure d’arrivée" v={booking.arrivalTime} />}
           <Row k="Voyageurs" v={String(booking.guestCount)} />
+          {booking.activityDescription && <Row k="Activité prévue" v={booking.activityDescription} />}
         </div>
 
         <div className="space-y-1.5 border-t border-line pt-3 text-sm">
@@ -218,6 +221,13 @@ export default function BookingDetailPage() {
               Ouvrir la conversation avec l’hôte
             </Link>
           </div>
+        )}
+
+        {(booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') && listing?.accessMethod && (
+          <AccessMethodBlock
+            accessMethod={listing.accessMethod}
+            accessInstructions={listing.accessInstructions}
+          />
         )}
 
         {isTenant && (booking.status === 'PENDING' || booking.status === 'CONFIRMED') && (
@@ -284,6 +294,18 @@ export default function BookingDetailPage() {
                   onChange={(e) => setReviewForm((f) => ({ ...f, comment: e.target.value }))}
                   className="field resize-y"
                   placeholder="Votre expérience, l’accueil, la conformité à l’annonce…"
+                />
+              </div>
+              <div>
+                <label className="label">
+                  Critères évalués <span className="font-normal">(optionnel)</span>
+                </label>
+                <input
+                  type="text"
+                  value={reviewForm.criteria}
+                  onChange={(e) => setReviewForm((f) => ({ ...f, criteria: e.target.value }))}
+                  className="field"
+                  placeholder="Ex. Propreté, conformité, accès"
                 />
               </div>
               <button type="submit" className="btn-primary">
