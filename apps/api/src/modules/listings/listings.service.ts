@@ -120,12 +120,25 @@ export class ListingsService {
     if (!listing) throw new NotFoundException('Annonce introuvable');
 
     if (listing.status !== ListingStatus.PUBLISHED) {
-      if (!currentUser || listing.hostId !== currentUser.id) {
+      const isOwner = !!currentUser && listing.hostId === currentUser.id;
+      if (!isOwner && !(currentUser && ListingsService.canModerate(currentUser))) {
         throw new NotFoundException('Annonce introuvable');
       }
     }
 
     return this.toResponseDto(listing);
+  }
+
+  /** Toutes les annonces, tous statuts confondus — réservé à la modération. */
+  async findAllForModeration(): Promise<ListingResponseDto[]> {
+    const listings = await this.prisma.listing.findMany({
+      include: {
+        photos: { orderBy: { position: 'asc' }, take: 1 },
+        host: { select: { id: true, firstName: true, lastName: true, stripeAccountStatus: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return listings.map((l) => this.toResponseDto(l));
   }
 
   async findMyListings(currentUser: AuthenticatedUser): Promise<ListingResponseDto[]> {
@@ -145,7 +158,7 @@ export class ListingsService {
     dto: UpdateListingDto,
     currentUser: AuthenticatedUser,
   ): Promise<ListingResponseDto> {
-    const listing = await this.findAndVerifyOwnership(id, currentUser);
+    const listing = await this.findAndVerifyAccess(id, currentUser);
 
     // Interdire modification si réservation CONFIRMED active
     const activeBooking = await this.prisma.booking.findFirst({
@@ -202,7 +215,7 @@ export class ListingsService {
   }
 
   async archive(id: string, currentUser: AuthenticatedUser): Promise<void> {
-    await this.findAndVerifyOwnership(id, currentUser);
+    await this.findAndVerifyAccess(id, currentUser);
     await this.prisma.listing.update({
       where: { id },
       data: { status: ListingStatus.ARCHIVED },
@@ -214,7 +227,7 @@ export class ListingsService {
     status: 'DRAFT' | 'PUBLISHED',
     currentUser: AuthenticatedUser,
   ): Promise<ListingResponseDto> {
-    const listing = await this.findAndVerifyOwnership(id, currentUser);
+    const listing = await this.findAndVerifyAccess(id, currentUser);
 
     if (listing.status === ListingStatus.ARCHIVED) {
       throw new BadRequestException('Une annonce archivée ne peut pas changer de statut');
@@ -236,7 +249,7 @@ export class ListingsService {
     mimeType: string,
     currentUser: AuthenticatedUser,
   ): Promise<ListingPhoto> {
-    await this.findAndVerifyOwnership(id, currentUser);
+    await this.findAndVerifyAccess(id, currentUser);
 
     if (!mimeType.startsWith('image/')) {
       throw new BadRequestException('Le fichier doit être une image');
@@ -258,7 +271,7 @@ export class ListingsService {
     order: string[],
     currentUser: AuthenticatedUser,
   ): Promise<ListingPhoto[]> {
-    await this.findAndVerifyOwnership(listingId, currentUser);
+    await this.findAndVerifyAccess(listingId, currentUser);
 
     const photos = await this.prisma.listingPhoto.findMany({ where: { listingId } });
     const ids = new Set(photos.map((p) => p.id));
@@ -283,7 +296,7 @@ export class ListingsService {
     photoId: string,
     currentUser: AuthenticatedUser,
   ): Promise<void> {
-    await this.findAndVerifyOwnership(listingId, currentUser);
+    await this.findAndVerifyAccess(listingId, currentUser);
 
     const photo = await this.prisma.listingPhoto.findUnique({ where: { id: photoId } });
     if (!photo || photo.listingId !== listingId) {
@@ -356,7 +369,7 @@ export class ListingsService {
     dto: CreateAvailabilityDto,
     currentUser: AuthenticatedUser,
   ): Promise<ListingAvailability> {
-    await this.findAndVerifyOwnership(listingId, currentUser);
+    await this.findAndVerifyAccess(listingId, currentUser);
 
     const dayStart = new Date(`${dto.date}T00:00:00.000Z`);
     const start = dto.startTime ? combineDateAndTime(dto.date, dto.startTime) : dayStart;
@@ -399,7 +412,7 @@ export class ListingsService {
     dto: CreateFaqItemDto,
     currentUser: AuthenticatedUser,
   ): Promise<ListingFaqItem> {
-    await this.findAndVerifyOwnership(listingId, currentUser);
+    await this.findAndVerifyAccess(listingId, currentUser);
     const count = await this.prisma.listingFaqItem.count({ where: { listingId } });
     return this.prisma.listingFaqItem.create({
       data: {
@@ -417,7 +430,7 @@ export class ListingsService {
     dto: UpdateFaqItemDto,
     currentUser: AuthenticatedUser,
   ): Promise<ListingFaqItem> {
-    await this.findAndVerifyOwnership(listingId, currentUser);
+    await this.findAndVerifyAccess(listingId, currentUser);
     const item = await this.prisma.listingFaqItem.findUnique({ where: { id: faqId } });
     if (!item || item.listingId !== listingId) throw new NotFoundException('Question introuvable');
 
@@ -436,7 +449,7 @@ export class ListingsService {
     faqId: string,
     currentUser: AuthenticatedUser,
   ): Promise<void> {
-    await this.findAndVerifyOwnership(listingId, currentUser);
+    await this.findAndVerifyAccess(listingId, currentUser);
     const item = await this.prisma.listingFaqItem.findUnique({ where: { id: faqId } });
     if (!item || item.listingId !== listingId) throw new NotFoundException('Question introuvable');
     await this.prisma.listingFaqItem.delete({ where: { id: faqId } });
@@ -447,7 +460,7 @@ export class ListingsService {
     availId: string,
     currentUser: AuthenticatedUser,
   ): Promise<void> {
-    await this.findAndVerifyOwnership(listingId, currentUser);
+    await this.findAndVerifyAccess(listingId, currentUser);
 
     const avail = await this.prisma.listingAvailability.findUnique({ where: { id: availId } });
     if (!avail || avail.listingId !== listingId) {
@@ -457,16 +470,54 @@ export class ListingsService {
     await this.prisma.listingAvailability.delete({ where: { id: availId } });
   }
 
-  private async findAndVerifyOwnership(
+  /** MODERATOR peut modérer n'importe quelle annonce. COMMERCIAL aussi, pour
+   * l'instant, en l'absence d'une équipe modération dédiée — à retirer le jour
+   * où ce n'est plus nécessaire. */
+  static canModerate(user: AuthenticatedUser): boolean {
+    return user.roles.includes('MODERATOR') || user.roles.includes('COMMERCIAL');
+  }
+
+  private async findAndVerifyAccess(
     listingId: string,
     currentUser: AuthenticatedUser,
   ): Promise<Listing> {
     const listing = await this.prisma.listing.findUnique({ where: { id: listingId } });
     if (!listing) throw new NotFoundException('Annonce introuvable');
-    if (listing.hostId !== currentUser.id) {
+    if (listing.hostId !== currentUser.id && !ListingsService.canModerate(currentUser)) {
       throw new ForbiddenException("Vous n'êtes pas propriétaire de cette annonce");
     }
     return listing;
+  }
+
+  /**
+   * Suppression définitive — réservée à la modération (pas aux hôtes, qui ont
+   * déjà `archive()` pour retirer leurs propres annonces). Bloquée si des
+   * réservations, conversations ou invitations y sont encore rattachées : on
+   * préserve l'historique financier/légal plutôt que de le perdre en cascade.
+   * Dans ce cas, l'archivage reste la marche à suivre.
+   */
+  async deletePermanently(listingId: string, currentUser: AuthenticatedUser): Promise<void> {
+    if (!ListingsService.canModerate(currentUser)) {
+      throw new ForbiddenException('Réservé à la modération');
+    }
+
+    const listing = await this.prisma.listing.findUnique({ where: { id: listingId } });
+    if (!listing) throw new NotFoundException('Annonce introuvable');
+
+    const [bookingCount, conversationCount, invitationCount] = await Promise.all([
+      this.prisma.booking.count({ where: { listingId } }),
+      this.prisma.conversation.count({ where: { listingId } }),
+      this.prisma.hostInvitation.count({ where: { listingId } }),
+    ]);
+    if (bookingCount > 0 || conversationCount > 0 || invitationCount > 0) {
+      throw new ConflictException(
+        "Cette annonce a un historique (réservations, messages ou invitation) — archivez-la plutôt que de la supprimer définitivement.",
+      );
+    }
+
+    // Photos/FAQ/disponibilités sont en cascade côté schéma ; le reste a été
+    // vérifié vide ci-dessus.
+    await this.prisma.listing.delete({ where: { id: listingId } });
   }
 
   private toResponseDto(listing: ListingWithRelations): ListingResponseDto {

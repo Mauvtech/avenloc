@@ -146,6 +146,9 @@ export const api = {
         body: JSON.stringify({ status }),
       }),
     archive: (id: string) => apiFetch<void>(`/listings/${id}`, { method: 'DELETE' }),
+    // Modération (MODERATOR/COMMERCIAL) : toutes les annonces, et suppression définitive.
+    moderationList: () => apiFetch<Listing[]>('/listings/moderation'),
+    deletePermanently: (id: string) => apiFetch<void>(`/listings/${id}/permanent`, { method: 'DELETE' }),
     uploadPhoto: (id: string, file: File) => {
       const fd = new FormData();
       fd.append('file', file);

@@ -20,7 +20,7 @@ function Logo() {
 interface LinkDef {
   href: string;
   label: string;
-  requiresRole?: 'HOST' | 'COMMERCIAL' | 'ADMIN';
+  requiresRole?: ('HOST' | 'COMMERCIAL' | 'ADMIN' | 'MODERATOR')[];
   badge?: number;
 }
 
@@ -114,15 +114,16 @@ export default function Nav() {
     pathname === href || (href !== '/' && pathname.startsWith(href)) || (pathname.startsWith('/auth') && authDestination.startsWith(href));
 
   const allLinks: LinkDef[] = [
-    { href: '/host', label: 'Espace hôte', requiresRole: 'HOST' },
-    { href: '/commercial', label: 'Espace commercial', requiresRole: 'COMMERCIAL' },
-    { href: '/admin', label: 'Administration', requiresRole: 'ADMIN' },
+    { href: '/host', label: 'Espace hôte', requiresRole: ['HOST'] },
+    { href: '/commercial', label: 'Espace commercial', requiresRole: ['COMMERCIAL'] },
+    { href: '/commercial/moderation', label: 'Modération', requiresRole: ['MODERATOR', 'COMMERCIAL'] },
+    { href: '/admin', label: 'Administration', requiresRole: ['ADMIN'] },
     { href: '/wishlist', label: 'Favoris' },
     { href: '/bookings', label: 'Réservations' },
     { href: '/conversations', label: 'Messages', badge: unread },
   ];
   const links: LinkDef[] = user
-    ? allLinks.filter((l) => !l.requiresRole || user.roles.includes(l.requiresRole))
+    ? allLinks.filter((l) => !l.requiresRole || l.requiresRole.some((r) => user.roles.includes(r)))
     : [];
 
   const NavLink = ({ href, label, badge }: LinkDef) => (
@@ -183,6 +184,9 @@ export default function Nav() {
                     {user.roles.includes('HOST') && <MenuItem href="/host" label="Espace hôte" />}
                     {user.roles.includes('COMMERCIAL') && (
                       <MenuItem href="/commercial" label="Espace commercial" />
+                    )}
+                    {(user.roles.includes('MODERATOR') || user.roles.includes('COMMERCIAL')) && (
+                      <MenuItem href="/commercial/moderation" label="Modération" />
                     )}
                     {user.roles.includes('ADMIN') && (
                       <MenuItem href="/admin" label="Administration" />

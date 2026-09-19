@@ -53,6 +53,14 @@ export class ListingsController {
     return this.listingsService.findMyListings(user);
   }
 
+  // Toutes les annonces, tous statuts/hôtes confondus — pour la modération.
+  @Get('moderation')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('MODERATOR', 'COMMERCIAL')
+  getAllForModeration(): Promise<ListingResponseDto[]> {
+    return this.listingsService.findAllForModeration();
+  }
+
   @Get(':id')
   findOne(
     @Param('id') id: string,
@@ -79,6 +87,18 @@ export class ListingsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<void> {
     return this.listingsService.archive(id, user);
+  }
+
+  // Suppression définitive — modération uniquement (les hôtes ont DELETE :id, qui archive).
+  @Delete(':id/permanent')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('MODERATOR', 'COMMERCIAL')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deletePermanently(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<void> {
+    return this.listingsService.deletePermanently(id, user);
   }
 
   @Patch(':id/status')

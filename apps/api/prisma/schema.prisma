@@ -23,6 +23,11 @@ enum UserRole {
   HOST
   COMMERCIAL
   ADMIN
+  // Peut modifier/dépublier/supprimer n'importe quelle annonce (modération de
+  // contenu), quel que soit son propriétaire. Pour l'instant, COMMERCIAL a
+  // aussi ces droits en pratique (voir listings.service.ts `canModerate`) —
+  // le temps qu'une équipe modération dédiée existe.
+  MODERATOR
 }
 
 enum IdentityStatus {

@@ -20,6 +20,13 @@ export function isAuthenticated(): boolean {
   return !!localStorage.getItem('accessToken');
 }
 
+/** MODERATOR peut modérer n'importe quelle annonce. COMMERCIAL aussi, pour
+ * l'instant, en l'absence d'une équipe modération dédiée (voir
+ * ListingsService.canModerate côté API — garder les deux synchronisés). */
+export function canModerate(user: { roles: string[] } | null | undefined): boolean {
+  return !!user && (user.roles.includes('MODERATOR') || user.roles.includes('COMMERCIAL'));
+}
+
 // Valide qu'une destination de retour post-connexion est une route interne sûre
 // (pas de protocole/hôte externe — évite l'open redirect via ?next=).
 export function safeNext(raw: string | null | undefined): string | null {

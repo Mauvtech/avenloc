@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isAuthenticated, loginHref } from '@/lib/auth';
+import { canModerate, isAuthenticated, loginHref } from '@/lib/auth';
 import ListingPhotos from '@/components/listing-photos';
 import ListingFaqEditor from '@/components/listing-faq-editor';
 import { useToast } from '@/components/toast';
+import { useConfirm } from '@/components/confirm';
 import { PageLoader } from '@/components/ui';
 import {
   ACCESS_METHOD_LABEL,
@@ -26,8 +27,11 @@ export default function EditListingPage() {
   const router = useRouter();
   const pathname = usePathname();
   const toast = useToast();
+  const confirm = useConfirm();
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
+  const [moderating, setModerating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
@@ -90,12 +94,35 @@ export default function EditListingPage() {
     }
     Promise.all([api.auth.me(), api.listings.getById(id)])
       .then(([me, l]) => {
-        if (l.hostId !== me.id) return router.replace('/host/spaces');
+        if (l.hostId !== me.id) {
+          if (!canModerate(me)) return router.replace('/host/spaces');
+          setModerating(true);
+        }
         hydrate(l);
       })
       .catch(() => router.replace('/host/spaces'))
       .finally(() => setLoading(false));
   }, [id, router]);
+
+  async function handleDeletePermanently() {
+    if (!listing) return;
+    const ok = await confirm({
+      title: 'Supprimer définitivement cette annonce ?',
+      body: "Action irréversible, réservée à la modération. Impossible si l'annonce a des réservations, messages ou une invitation liés — dans ce cas, archivez-la plutôt.",
+      confirmLabel: 'Supprimer définitivement',
+      danger: true,
+    });
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await api.listings.deletePermanently(listing.id);
+      toast.success('Annonce supprimée définitivement');
+      router.push('/commercial/moderation');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Suppression impossible');
+      setDeleting(false);
+    }
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -137,12 +164,26 @@ export default function EditListingPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <div>
-        <Link href="/host/spaces" className="text-sm text-muted hover:text-ink">
-          ← Mes annonces
+        <Link href={moderating ? '/commercial/moderation' : '/host/spaces'} className="text-sm text-muted hover:text-ink">
+          {moderating ? '← Modération' : '← Mes annonces'}
         </Link>
         <h1 className="mt-1 text-2xl font-extrabold">Modifier l&apos;annonce</h1>
         <p className="text-sm text-muted">{typeLabel(listing.type)}</p>
       </div>
+
+      {moderating && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warn/30 bg-warn-tint px-4 py-3 text-sm">
+          <span className="font-semibold text-warn-fg">Mode modération</span>
+          <span className="text-muted">— vous modifiez l&apos;annonce d&apos;un autre hôte.</span>
+          <button
+            onClick={handleDeletePermanently}
+            disabled={deleting}
+            className="ml-auto text-sm font-semibold text-danger-fg hover:underline"
+          >
+            {deleting ? 'Suppression…' : 'Supprimer définitivement'}
+          </button>
+        </div>
+      )}
 
       {/* Détails */}
       <form onSubmit={handleSave} className="card space-y-4 p-5">

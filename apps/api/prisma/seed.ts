@@ -256,6 +256,11 @@ async function main() {
     update: { roles: ['ADMIN'] },
     create: { email: 'admin@aven.dev', hashedPassword, firstName: 'Admin', lastName: 'Aven', roles: ['ADMIN'] },
   });
+  const moderator = await prisma.user.upsert({
+    where: { email: 'moderator@aven.dev' },
+    update: { roles: ['MODERATOR'] },
+    create: { email: 'moderator@aven.dev', hashedPassword, firstName: 'Modération', lastName: 'Aven', roles: ['MODERATOR'] },
+  });
   console.log('✓ Utilisateurs seedés (voir le récapitulatif en fin de script)');
 
   // Repart d'une base propre pour les annonces à chaque seed : la base de dev
@@ -774,6 +779,7 @@ async function main() {
   console.log('  Locataire  → tenant@aven.dev     / Password123!  (Jean Martin — historique + résa en cours)');
   console.log('  Commercial → commercial@aven.dev / Password123!  (Sofia Nguyen)');
   console.log('  Admin      → admin@aven.dev      / Password123!  (accès /admin, seul compte à activer/désactiver les features)');
+  console.log(`  Modération → ${moderator.email} / Password123!  (peut modifier/archiver/supprimer n'importe quelle annonce — le rôle COMMERCIAL a aussi ce droit pour le moment)`);
   console.log('\nComptes secondaires (même mot de passe, pour la variété du catalogue) :');
   console.log('  host2@aven.dev (Lucas Bernard, Lyon) · host3@aven.dev (Camille Rousseau, Marseille)');
   console.log('  reviewer1@aven.dev (Sophie Lambert) · reviewer2@aven.dev (Nicolas Petit) — auteurs des avis');

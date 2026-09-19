@@ -59,9 +59,14 @@ export default function CommercialDashboardPage() {
       <PageHeader
         title="Espace commercial"
         action={
-          <Link href="/commercial/new" className="btn-primary">
-            + Nouvelle fiche
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/commercial/moderation" className="btn-ghost">
+              Modération
+            </Link>
+            <Link href="/commercial/new" className="btn-primary">
+              + Nouvelle fiche
+            </Link>
+          </div>
         }
       />
 
