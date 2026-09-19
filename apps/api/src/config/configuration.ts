@@ -32,15 +32,13 @@ export const configuration = () => ({
   },
 
   features: {
-    // Flags actifs au démarrage, ex. FEATURES="simulatePayments"
+    // Valeurs de repli utilisées uniquement à la toute première initialisation
+    // (aucune ligne FeatureFlagState en base) — ensuite, seul le compte ADMIN
+    // change les flags via PATCH /features, persistés en base.
     initial: (process.env['FEATURES'] ?? '')
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
-    // Autorise PATCH /features (toggle à chaud). Actif hors production par défaut.
-    adminEnabled:
-      (process.env['FEATURES_ADMIN'] ??
-        (process.env['NODE_ENV'] === 'production' ? 'false' : 'true')) === 'true',
   },
 
   storage: {

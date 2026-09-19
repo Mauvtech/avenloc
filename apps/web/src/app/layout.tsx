@@ -3,7 +3,6 @@ import { Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import Nav from '@/components/nav';
 import Footer from '@/components/footer';
-import DevToolbar from '@/components/dev-toolbar';
 import { ToastProvider } from '@/components/toast';
 import { ConfirmProvider } from '@/components/confirm';
 
@@ -31,7 +30,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Nav />
             <main className="mx-auto w-full max-w-[1120px] flex-1 px-4 py-6 min-[641px]:p-8">{children}</main>
             <Footer />
-            <DevToolbar />
           </ConfirmProvider>
         </ToastProvider>
       </body>

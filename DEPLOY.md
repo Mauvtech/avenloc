@@ -74,7 +74,6 @@ Tu as maintenant un canvas vide.
    JWT_ACCESS_EXPIRES_IN=15m
    JWT_REFRESH_EXPIRES_IN=30d
    FEATURES=simulatePayments
-   FEATURES_ADMIN=true
    SEED_ON_INIT=true
    UPLOADS_DIR=/data/uploads
    ```

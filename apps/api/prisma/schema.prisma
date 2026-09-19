@@ -22,6 +22,7 @@ enum UserRole {
   TENANT
   HOST
   COMMERCIAL
+  ADMIN
 }
 
 enum IdentityStatus {
@@ -222,6 +223,15 @@ model PlatformConfigHistory {
   changedBy               String?  @db.Uuid // userId admin — null si changement système
 }
 
+// Interrupteurs de fonctionnalités (ex. paiements Stripe réels vs simulés).
+// Singleton persistant — seul un compte ADMIN peut les modifier (PATCH /features).
+// Un cache en mémoire évite un aller-retour base à chaque lecture (FeaturesService).
+model FeatureFlagState {
+  id        String   @id @default("default")
+  flags     Json
+  updatedAt DateTime @updatedAt
+}
+
 // ─── LISTINGS ─────────────────────────────────────────────────────────────────
 
 model Listing {
@@ -231,7 +241,7 @@ model Listing {
   status ListingStatus @default(DRAFT)
 
   // Date de vérification de cet espace par la plateforme ; indépendante du statut de publication et de l’identité de l’hôte.
-  verifiedAt  DateTime? @db.Timestamptz
+  verifiedAt DateTime? @db.Timestamptz
 
   title       String
   description String

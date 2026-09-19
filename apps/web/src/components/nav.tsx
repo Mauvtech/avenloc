@@ -20,7 +20,7 @@ function Logo() {
 interface LinkDef {
   href: string;
   label: string;
-  requiresRole?: 'HOST' | 'COMMERCIAL';
+  requiresRole?: 'HOST' | 'COMMERCIAL' | 'ADMIN';
   badge?: number;
 }
 
@@ -116,6 +116,7 @@ export default function Nav() {
   const allLinks: LinkDef[] = [
     { href: '/host', label: 'Espace hôte', requiresRole: 'HOST' },
     { href: '/commercial', label: 'Espace commercial', requiresRole: 'COMMERCIAL' },
+    { href: '/admin', label: 'Administration', requiresRole: 'ADMIN' },
     { href: '/wishlist', label: 'Favoris' },
     { href: '/bookings', label: 'Réservations' },
     { href: '/conversations', label: 'Messages', badge: unread },
@@ -182,6 +183,9 @@ export default function Nav() {
                     {user.roles.includes('HOST') && <MenuItem href="/host" label="Espace hôte" />}
                     {user.roles.includes('COMMERCIAL') && (
                       <MenuItem href="/commercial" label="Espace commercial" />
+                    )}
+                    {user.roles.includes('ADMIN') && (
+                      <MenuItem href="/admin" label="Administration" />
                     )}
                     {!user.roles.includes('HOST') && (
                       <MenuItem href="/listings/new" label="Publier un espace" />

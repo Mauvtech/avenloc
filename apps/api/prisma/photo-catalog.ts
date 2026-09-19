@@ -44,8 +44,10 @@ export const PHOTO_CATALOG: Record<string, string[]> = {
     'photo-1464366400600-7168b8af9bc3',
     'photo-1511578314322-379afb476865',
   ],
+  // Le premier ID de ce tableau (photo-1590674899484-...) a été retiré : l'image
+  // n'existe plus côté Unsplash (404), ce qui cassait la couverture des annonces
+  // de parking. Les deux ID restants ont été revérifiés manuellement.
   PARKING: [
-    'photo-1590674899484-d5640e854aba',
     'photo-1506521781263-d8422e82f27a',
     'photo-1573348722427-f1d6819fdf98',
   ],

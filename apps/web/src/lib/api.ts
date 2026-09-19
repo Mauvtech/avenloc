@@ -326,7 +326,6 @@ export interface FeatureFlags {
 }
 export interface FeaturesResponse {
   flags: FeatureFlags;
-  adminEnabled: boolean;
 }
 
 export interface PaymentHistoryItem {
