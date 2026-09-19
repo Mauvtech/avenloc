@@ -15,6 +15,7 @@ export class SearchService {
       lng: query.lng,
       radiusKm: query.radius,
       type: query.type,
+      instantBook: query.instantBook,
       minPrice: query.minPrice,
       maxPrice: query.maxPrice,
       maxGuests: query.maxGuests,

@@ -5,6 +5,7 @@ export interface SearchFilters {
   lng?: number;
   radiusKm: number;
   type?: ListingType;
+  instantBook?: boolean;
   minPrice?: number;
   maxPrice?: number;
   maxGuests?: number;

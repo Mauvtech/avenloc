@@ -41,13 +41,15 @@ export default function DateRangeField({ startDate, endDate, onChange }: Props) 
       ? `${dateShort(startDate)} → ${dateShort(endDate)}`
       : startDate
         ? `${dateShort(startDate)} → …`
-        : 'Dates (option.)';
+        : '\u00a0';
 
   return (
     <div ref={ref} className="relative">
       <div className="field flex items-center justify-between p-0">
         <button
           type="button"
+          aria-label="Choisir les dates"
+          aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
           className="flex-1 px-3 py-2.5 text-left"
         >

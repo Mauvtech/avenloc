@@ -17,7 +17,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: 'Aven — Louez l’espace qu’il vous faut',
+  title: 'Sppot by Aven — Trouvez votre espace de travail',
   description:
     'Appartements, bureaux, salles de réunion, ateliers, entrepôts et parkings — à réserver en quelques clics.',
 };
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ToastProvider>
           <ConfirmProvider>
             <Nav />
-            <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">{children}</main>
+            <main className="mx-auto w-full max-w-[1120px] flex-1 px-4 py-6 min-[641px]:p-8">{children}</main>
             <Footer />
             <DevToolbar />
           </ConfirmProvider>

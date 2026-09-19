@@ -10,11 +10,9 @@ import type { User } from '@/lib/types';
 
 function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-2.5">
-      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-[15px] font-extrabold text-white shadow-xs">
-        A
-      </span>
-      <span className="font-display text-[18px] font-bold tracking-tight">Aven</span>
+    <Link href="/" className="flex shrink-0 items-baseline gap-1.5" aria-label="Sppot by Aven — Accueil">
+      <span className="font-display text-xl font-bold tracking-[-0.01em]">Sppot</span>
+      <span className="text-[13px] font-medium text-muted">by Aven</span>
     </Link>
   );
 }
@@ -31,6 +29,7 @@ export default function Nav() {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [unread, setUnread] = useState(0);
+  const [authDestination, setAuthDestination] = useState('');
   const [mounted, setMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false); // dropdown avatar (desktop)
   const [drawerOpen, setDrawerOpen] = useState(false); // panneau plein écran (mobile)
@@ -70,6 +69,7 @@ export default function Nav() {
   useEffect(() => {
     setMenuOpen(false);
     setDrawerOpen(false);
+    setAuthDestination(new URLSearchParams(window.location.search).get('next') ?? '');
   }, [pathname]);
 
   useEffect(() => {
@@ -111,7 +111,7 @@ export default function Nav() {
   }
 
   const isActive = (href: string) =>
-    pathname === href || (href !== '/' && pathname.startsWith(href));
+    pathname === href || (href !== '/' && pathname.startsWith(href)) || (pathname.startsWith('/auth') && authDestination.startsWith(href));
 
   const allLinks: LinkDef[] = [
     { href: '/host', label: 'Espace hôte', requiresRole: 'HOST' },
@@ -141,15 +141,24 @@ export default function Nav() {
   );
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-surface/85 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2.5 sm:px-6">
+    <header className="relative z-40 border-b border-line bg-surface">
+      <div className="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-2.5 px-5 py-4">
         <Logo />
 
+        <nav aria-label="Espaces" className="role-switcher ml-auto flex gap-1 rounded bg-canvas p-[3px]">
+          {[{ href: '/bookings', label: 'Espace client' }, { href: '/host', label: 'Espace hôte' }, { href: '/commercial', label: 'Commercial' }].map(({ href, label }) => (
+            <Link key={href} href={mounted && user ? href : loginHref(href)}
+              className={`rounded-[6px] px-3.5 py-[7px] text-[13px] font-medium ${isActive(href) ? 'bg-white text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)]' : 'text-muted hover:text-ink'}`}>
+              {label}
+            </Link>
+          ))}
+        </nav>
+
         {/* ── Desktop ─────────────────────────────────────────────── */}
-        <div className="hidden min-h-[36px] items-center gap-1 md:flex">
+        <div className="hidden items-center gap-1 md:flex">
           {!mounted ? null : user ? (
             <>
-              {links.map((l) => (
+              {links.filter((l) => !l.requiresRole && l.href !== "/bookings").map((l) => (
                 <NavLink key={l.href} {...l} />
               ))}
               <div ref={menuRef} className="relative ml-1.5">
@@ -187,20 +196,12 @@ export default function Nav() {
                 )}
               </div>
             </>
-          ) : (
-            <>
-              <Link href={loginHref(pathname)} className="btn-ghost btn-sm">
-                Se connecter
-              </Link>
-              <Link href={registerHref(pathname)} className="btn-primary btn-sm">
-                S&apos;inscrire
-              </Link>
-            </>
-          )}
+          ) : null
+          }
         </div>
 
         {/* ── Mobile ──────────────────────────────────────────────── */}
-        <button
+        {mounted && user && <button
           onClick={() => setDrawerOpen(true)}
           className="relative flex h-9 w-9 items-center justify-center rounded-md text-ink hover:bg-canvas md:hidden"
           aria-label="Ouvrir le menu"
@@ -213,7 +214,7 @@ export default function Nav() {
           {mounted && unread > 0 && (
             <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-brand" />
           )}
-        </button>
+        </button>}
       </div>
 
       {/* ── Panneau mobile ────────────────────────────────────────── */}

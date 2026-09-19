@@ -33,74 +33,24 @@ function LoginForm() {
     }
   }
 
-  const tab = 'flex-1 px-4 py-3 text-center text-sm font-semibold transition-colors';
-
+  const roleLabel = next?.startsWith('/host') ? 'Espace hôte' : next?.startsWith('/commercial') ? 'Espace commercial' : 'Espace client';
   return (
-    <div className="mx-auto max-w-sm py-6">
-      <div className="mb-7 flex items-center justify-center gap-2.5">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-[15px] font-extrabold text-white">
-          A
-        </span>
-        <span className="text-lg font-bold">Aven</span>
+    <div className="auth-reference">
+      <h1 className="mb-1.5 text-[22px] font-bold">{roleLabel}</h1>
+      <p className="mb-6 text-[13px] text-muted">Connectez-vous ou créez un compte pour accéder à cet espace.</p>
+      <div className="auth-tabs">
+        <span className="auth-tab auth-tab-active">Se connecter</span>
+        <Link href={registerHref(next)} className="auth-tab">Créer un compte</Link>
       </div>
-
-      {next && (
-        <p className="mb-4 rounded-md bg-brand-tint px-3 py-2 text-center text-sm text-brand-fg">
-          Connectez-vous pour continuer là où vous en étiez.
-        </p>
-      )}
-
-      <div className="card overflow-hidden">
-        <div className="flex border-b border-line">
-          <span className={`${tab} bg-surface text-ink`}>Connexion</span>
-          <Link href={registerHref(next)} className={`${tab} bg-canvas text-muted hover:text-ink`}>
-            Inscription
-          </Link>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-3.5 p-6">
-          <div>
-            <label className="label">Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="field"
-            />
-          </div>
-          <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label className="label mb-0">Mot de passe</label>
-              <Link href="/auth/forgot" className="text-xs font-semibold text-brand-fg">
-                Oublié ?
-              </Link>
-            </div>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="field"
-            />
-          </div>
-          {error && <p className="text-sm text-danger-fg">{error}</p>}
-          <button type="submit" disabled={loading} className="btn-primary w-full">
-            {loading ? 'Chargement…' : 'Se connecter'}
-          </button>
-
-          <a href={`${API_URL}/auth/google`} className="btn-ghost w-full">
-            Continuer avec Google
-          </a>
-        </form>
-      </div>
-
-      <p className="mt-5 text-center text-sm text-muted">
-        Pas encore de compte ?{' '}
-        <Link href={registerHref(next)} className="font-semibold">
-          S&apos;inscrire
-        </Link>
-      </p>
+      <a href={`${API_URL}/auth/google`} className="btn-ghost mb-5 w-full font-medium">Continuer avec Google</a>
+      <div className="mb-5 flex items-center gap-3 text-xs text-muted"><span className="h-px flex-1 bg-line" />ou<span className="h-px flex-1 bg-line" /></div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div><label htmlFor="email" className="mb-1.5 block text-[13px] text-muted">Email</label><input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vous@exemple.com" className="field" /></div>
+        <div><label htmlFor="password" className="mb-1.5 block text-[13px] text-muted">Mot de passe</label><input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Votre mot de passe" className="field" /></div>
+        {error && <p role="alert" className="text-sm text-danger-fg">{error}</p>}
+        <button type="submit" disabled={loading} className="btn-primary w-full py-3">{loading ? 'Connexion…' : 'Se connecter'}</button>
+        <Link href="/auth/forgot" className="block text-center text-xs text-muted underline">Mot de passe oublié ?</Link>
+      </form>
     </div>
   );
 }

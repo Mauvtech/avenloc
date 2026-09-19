@@ -68,7 +68,7 @@ export default function CommercialHistoryPage() {
   if (!ready || loading) return <PageLoader />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="space-y-4">
       <PageHeader
         title="Historique"
         action={

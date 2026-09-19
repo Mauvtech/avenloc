@@ -55,7 +55,7 @@ export default function CommercialDashboardPage() {
   if (!ready || loading) return <PageLoader />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Espace commercial"
         action={

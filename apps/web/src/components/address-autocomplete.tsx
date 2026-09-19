@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { geocode, type GeoResult } from '@/lib/geo';
 
 interface Props {
+  id?: string;
   value: string;
   onQueryChange: (text: string) => void;
   onSelect: (result: GeoResult) => void;
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export default function AddressAutocomplete({
+  id,
   value,
   onQueryChange,
   onSelect,
@@ -63,8 +65,8 @@ export default function AddressAutocomplete({
 
   function choose(r: GeoResult) {
     skipNextFetch.current = true;
-    onSelect(r);
     onQueryChange(kind === 'city' ? `${r.city} (${r.postalCode})` : r.label);
+    onSelect(r);
     setOpen(false);
     setResults([]);
   }
@@ -72,6 +74,7 @@ export default function AddressAutocomplete({
   return (
     <div ref={boxRef} className={`relative ${className ?? ''}`}>
       <input
+        id={id}
         type="text"
         className="field"
         autoComplete="off"

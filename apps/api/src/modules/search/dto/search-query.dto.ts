@@ -1,5 +1,6 @@
 import {
   IsNumber,
+  IsBoolean,
   IsOptional,
   IsString,
   IsEnum,
@@ -82,6 +83,11 @@ export class SearchQueryDto {
   @IsOptional()
   @IsEnum(['price_asc', 'price_desc', 'distance', 'newest'])
   sort: 'price_asc' | 'price_desc' | 'distance' | 'newest' = 'distance';
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' ? true : value === 'false' ? false : value)
+  @IsBoolean()
+  instantBook?: boolean;
 
   get amenitiesArray(): string[] {
     if (!this.amenities) return [];

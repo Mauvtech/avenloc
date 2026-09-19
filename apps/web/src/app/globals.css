@@ -137,3 +137,31 @@
     scrollbar-width: none;
   }
 }
+
+/* Geometry of the supplied September 2026 marketplace reference. */
+.marketplace-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
+.marketplace-search { display: grid; grid-template-columns: 1fr 1fr 1fr auto; border: 1px solid #E7E7E7; border-radius: 12px; box-shadow: 0 1px 3px rgb(0 0 0 / 4%); }
+.marketplace-search-field { min-width: 0; padding: 8px 20px; border-right: 1px solid #E7E7E7; }
+.marketplace-search-field .label { margin-bottom: 0; font-size: 11px; font-weight: 500; color: #6B7280; }
+.marketplace-search-field .field { border: 0; border-radius: 0; padding: 0; box-shadow: none; }
+.marketplace-search-field .field button { padding: 2px 0; min-height: 24px; }
+.marketplace-search-field input, .marketplace-search-field select { min-height: 24px; padding: 2px 0; }
+.marketplace-search-field select { appearance: none; }
+.marketplace-search-submit { background: #2454FF; color: white; border-radius: 0 11px 11px 0; padding: 0 26px; font-size: 14px; font-weight: 600; }
+.marketplace-search-submit:disabled { opacity: .6; cursor: wait; }
+.marketplace-detail { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(0,1fr); gap: 48px; }
+.auth-reference { width: 100%; max-width: 400px; margin: 28px auto 60px; padding: 32px; }
+.auth-tabs { display: flex; gap: 4px; width: fit-content; background: #F5F5F4; border-radius: 8px; padding: 3px; margin-bottom: 24px; }
+.auth-tab { padding: 7px 16px; font-size: 13px; font-weight: 500; color: #6B7280; border-radius: 6px; }
+.auth-tab-active { background: white; color: #14171A; box-shadow: 0 1px 2px rgb(0 0 0 / 6%); }
+@media (max-width: 900px) { .marketplace-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .marketplace-detail { grid-template-columns: minmax(0,1fr); gap:28px; } }
+@media (max-width: 640px) {
+ .marketplace-search { grid-template-columns: minmax(0,1fr); }
+ .marketplace-search-field { border-right: 0; border-bottom: 1px solid #E7E7E7; }
+ .marketplace-search-submit { padding: 14px 0; border-radius: 0 0 11px 11px; }
+ .marketplace-grid { gap:14px; }
+ .auth-reference { padding: 24px 16px; }
+}
+@media (max-width:420px) { .marketplace-grid { grid-template-columns: minmax(0,1fr); } }
+
+@media (max-width:380px) { .role-switcher a { padding-inline: 8px; font-size: 12px; } }
