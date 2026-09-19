@@ -9,6 +9,7 @@ import type {
 } from '../ports/search-engine.port';
 
 interface RawListingRow {
+  verified_at: Date | null;
   id: string;
   title: string;
   type: string;
@@ -124,6 +125,7 @@ export class PostgisSearchAdapter implements SearchEnginePort {
       SELECT
         l.id,
         l.title,
+        l."verifiedAt" AS verified_at,
         l.type,
         l.city,
         l.latitude,
@@ -163,6 +165,7 @@ export class PostgisSearchAdapter implements SearchEnginePort {
     const listings: ListingSearchItem[] = rows.map((row) => ({
       id: row.id,
       title: row.title,
+      verifiedAt: row.verified_at?.toISOString() ?? null,
       type: row.type,
       city: row.city,
       latitude: Number(row.latitude),

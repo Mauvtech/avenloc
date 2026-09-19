@@ -18,6 +18,7 @@ export interface SearchFilters {
 }
 
 export interface ListingSearchItem {
+  verifiedAt: string | null;
   id: string;
   title: string;
   type: string;

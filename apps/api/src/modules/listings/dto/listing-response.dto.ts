@@ -14,6 +14,7 @@ export class ListingResponseDto {
   hostId: string;
   type: ListingType;
   status: ListingStatus;
+  verifiedAt: Date | null;
   title: string;
   description: string;
   addressLine1: string;

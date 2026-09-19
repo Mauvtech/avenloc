@@ -19,6 +19,7 @@ const otherHost: AuthenticatedUser = { id: 'host-2', email: 'host2@test.com', ro
 
 const mockListing: Listing & { photos: []; availabilities: [] } = {
   id: 'listing-1',
+  verifiedAt: null,
   hostId: 'host-1',
   type: ListingType.APARTMENT,
   status: ListingStatus.DRAFT,
@@ -109,6 +110,12 @@ describe('ListingsService', () => {
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  it.each([null, new Date('2026-09-19T12:00:00Z')])('exposes the space verification independently of publication (%s)', async (verifiedAt) => {
+    prisma.listing.findUnique.mockResolvedValue({ ...mockListing, status: ListingStatus.PUBLISHED, verifiedAt });
+    const result = await service.findOne(mockListing.id);
+    expect(result.verifiedAt).toEqual(verifiedAt);
+  });
 
   // ── create ────────────────────────────────────────────────────────────────
 

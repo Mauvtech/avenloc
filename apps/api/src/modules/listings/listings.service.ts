@@ -475,6 +475,7 @@ export class ListingsService {
       hostId: listing.hostId,
       type: listing.type,
       status: listing.status,
+      verifiedAt: listing.verifiedAt ?? null,
       title: listing.title,
       description: listing.description,
       addressLine1: listing.addressLine1,

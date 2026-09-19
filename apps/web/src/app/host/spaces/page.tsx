@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import VerificationBadge from '@/components/verification-badge';
 import CategoryIcon from '@/components/category-icon';
 import { EmptyState, PageHeader, PageLoader } from '@/components/ui';
 import { useConfirm } from '@/components/confirm';
@@ -148,7 +149,7 @@ function HostSpaces() {
                   <div className="flex items-start gap-3">
                     <CategoryIcon type={l.type} size={20} className="mt-0.5 flex-none text-brand-fg" />
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-bold">{l.title}</div>
+                      <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-bold">{l.title}</span><VerificationBadge verifiedAt={l.verifiedAt} /></div>
                       <div className="text-xs text-muted">
                         {typeLabel(l.type)}
                         {rev ? ` · ${rev.count} résa · ${fmtEUR(rev.net)}` : ' · aucune réservation'}
