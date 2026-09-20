@@ -1,8 +1,9 @@
-import { PrismaClient, ListingType, PricingUnit, CancellationPolicy } from '@prisma/client';
+import { PrismaClient, Prisma, ListingType, PricingUnit, CancellationPolicy } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { photosForType } from './photo-catalog';
 
-const prisma = new PrismaClient();
+const client = new PrismaClient();
+let prisma: Prisma.TransactionClient;
 
 async function ensurePhotos(listingId: string, type: string, offset: number) {
   const count = await prisma.listingPhoto.count({ where: { listingId } });
@@ -135,24 +136,18 @@ interface TypeTemplate {
 }
 
 const TYPE_TEMPLATES: TypeTemplate[] = [
-  { type: ListingType.APARTMENT, titles: ['Appartement cosy', 'Appartement lumineux', 'Studio moderne', 'T2 rénové', 'Appartement avec balcon'], pricingUnit: PricingUnit.NIGHT, priceRange: [55, 150], photoCategory: 'APARTMENT', maxGuestsRange: [1, 4] },
-  { type: ListingType.HOUSE, titles: ['Maison familiale', 'Villa avec jardin', 'Maison de ville', 'Pavillon calme'], pricingUnit: PricingUnit.NIGHT, priceRange: [90, 220], photoCategory: 'HOUSE', maxGuestsRange: [2, 8] },
-  { type: ListingType.ROOM, titles: ['Chambre privée', "Chambre chez l'habitant", 'Chambre calme et lumineuse'], pricingUnit: PricingUnit.NIGHT, priceRange: [35, 70], photoCategory: 'ROOM', maxGuestsRange: [1, 2] },
   { type: ListingType.OFFICE, titles: ['Bureau privé', 'Bureau partagé', 'Espace de coworking', 'Bureau design'], pricingUnit: PricingUnit.HOUR, priceRange: [10, 30], photoCategory: 'OFFICE', maxGuestsRange: [1, 8] },
   { type: ListingType.MEETING_ROOM, titles: ['Salle de réunion', 'Salle de conférence', 'Salle équipée'], pricingUnit: PricingUnit.HOUR, priceRange: [25, 70], photoCategory: 'MEETING_ROOM', maxGuestsRange: [4, 20] },
   { type: ListingType.WORKSHOP, titles: ["Atelier d'artiste", 'Atelier partagé', 'Espace créatif manuel'], pricingUnit: PricingUnit.HOUR, priceRange: [20, 45], photoCategory: 'WORKSHOP', maxGuestsRange: [2, 12] },
-  { type: ListingType.WAREHOUSE, titles: ['Entrepôt logistique', 'Entrepôt de stockage', 'Local de stockage'], pricingUnit: PricingUnit.DAY, priceRange: [60, 180], photoCategory: 'WAREHOUSE' },
   { type: ListingType.EVENT_SPACE, titles: ['Salle de réception', 'Loft événementiel', 'Espace pour séminaire'], pricingUnit: PricingUnit.HOUR, priceRange: [40, 120], photoCategory: 'EVENT_SPACE', maxGuestsRange: [10, 150] },
-  { type: ListingType.PARKING, titles: ['Place de parking', 'Garage sécurisé', 'Parking couvert'], pricingUnit: PricingUnit.DAY, priceRange: [6, 18], photoCategory: 'PARKING' },
-  { type: ListingType.SHOP, titles: ['Boutique en rez-de-chaussée', 'Local commercial', 'Corner shop éphémère'], pricingUnit: PricingUnit.DAY, priceRange: [40, 110], photoCategory: 'OTHER' },
-  { type: ListingType.PRACTICE_ROOM, titles: ['Cabinet médical', 'Cabinet paramédical', 'Salle de consultation'], pricingUnit: PricingUnit.HOUR, priceRange: [18, 35], photoCategory: 'OFFICE', maxGuestsRange: [1, 3] },
-  { type: ListingType.RESTAURANT, titles: ['Restaurant privatisable', 'Salle de restaurant', 'Espace traiteur'], pricingUnit: PricingUnit.HOUR, priceRange: [50, 150], photoCategory: 'EVENT_SPACE', maxGuestsRange: [10, 80] },
-  { type: ListingType.CREATIVE_STUDIO, titles: ['Studio photo', 'Studio créatif', "Studio d'enregistrement"], pricingUnit: PricingUnit.HOUR, priceRange: [25, 60], photoCategory: 'WORKSHOP', maxGuestsRange: [1, 10] },
-  { type: ListingType.OTHER, titles: ['Espace polyvalent', 'Local atypique'], pricingUnit: PricingUnit.DAY, priceRange: [30, 90], photoCategory: 'OTHER' },
+  { type: ListingType.SHOP, titles: ['Boutique en rez-de-chaussée', 'Local commercial', 'Corner shop éphémère'], pricingUnit: PricingUnit.HOUR, priceRange: [15, 45], photoCategory: 'SHOP', maxGuestsRange: [2, 20] },
+  { type: ListingType.PRACTICE_ROOM, titles: ['Cabinet médical', 'Cabinet paramédical', 'Salle de consultation'], pricingUnit: PricingUnit.HOUR, priceRange: [18, 35], photoCategory: 'PRACTICE_ROOM', maxGuestsRange: [1, 3] },
+  { type: ListingType.RESTAURANT, titles: ['Restaurant privatisable', 'Salle de restaurant', 'Espace traiteur'], pricingUnit: PricingUnit.HOUR, priceRange: [50, 150], photoCategory: 'RESTAURANT', maxGuestsRange: [10, 80] },
+  { type: ListingType.CREATIVE_STUDIO, titles: ['Studio photo', 'Studio créatif', "Studio d'enregistrement"], pricingUnit: PricingUnit.HOUR, priceRange: [25, 60], photoCategory: 'CREATIVE_STUDIO', maxGuestsRange: [1, 10] },
 ];
 
 /** Génère un grand catalogue de remplissage (hôtes "filler-host-*", pas de
- * réservations/avis dessus — sert à peupler recherche/pagination/filtres). */
+ * réservations à venir ; des avis liés à des réservations terminées). */
 async function generateFillerListings(count: number, hashedPassword: string): Promise<number> {
   const FILLER_HOST_COUNT = 16;
   const fillerHosts: { id: string }[] = [];
@@ -209,8 +204,8 @@ async function generateFillerListings(count: number, hashedPassword: string): Pr
         type: tpl.type,
         status,
         verifiedAt: isVerified ? verifiedAt(randInt(1, 90)) : null,
-        title: `${titleBase} — ${city.name}`,
-        description: `${titleBase} situé au ${houseNumber} ${street}, ${city.name}. Disponible à la réservation, idéal pour un usage ponctuel ou récurrent.`,
+        title: `${titleBase} à ${city.name}`,
+        description: `${titleBase} disponible à l'heure pour vos activités professionnelles. Un espace adapté à un usage ponctuel ou récurrent, avec les équipements présentés dans l'annonce.`,
         addressLine1: `${houseNumber} ${street}`,
         city: city.name,
         postalCode: city.postal,
@@ -278,7 +273,7 @@ async function generateFillerListings(count: number, hashedPassword: string): Pr
   return created;
 }
 
-async function main() {
+async function seed() {
   console.log('🌱 Seeding database...');
 
   await prisma.platformConfig.upsert({
@@ -344,40 +339,44 @@ async function main() {
   });
   console.log('✓ Utilisateurs seedés (voir le récapitulatif en fin de script)');
 
-  // Repart d'une base propre pour les annonces à chaque seed : la base de dev
-  // accumule des fiches de test (e2e, essais manuels) qu'on ne veut pas revoir
-  // dans le catalogue de démo. CASCADE nettoie photos/FAQ/réservations/avis/
-  // établissements/invitations qui en dépendent. Users et PlatformConfig sont
-  // préservés (gérés par upsert au-dessus).
-  await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE "Listing", "Establishment", "HostInvitation" RESTART IDENTITY CASCADE;`,
-  );
+  // Remplacement atomique du catalogue de démo. DELETE laisse les lecteurs
+  // consulter l'ancien catalogue jusqu'au commit, contrairement à TRUNCATE.
+  // main() refuse cette opération si la base contient des comptes non-démo.
+  await prisma.message.deleteMany();
+  await prisma.conversation.deleteMany();
+  await prisma.review.deleteMany();
+  await prisma.deposit.deleteMany();
+  await prisma.payment.deleteMany();
+  await prisma.booking.deleteMany();
+  await prisma.listing.deleteMany();
+  await prisma.hostInvitation.deleteMany();
+  await prisma.establishment.deleteMany();
   console.log('✓ Anciennes annonces de test nettoyées');
 
   // ── Paris — Marie (host) ──────────────────────────────────────────────────
-  const apartment = await prisma.listing.create({
+  const creativeStudio = await prisma.listing.create({
     data: {
       id: '72d60f9a-8528-49e5-a911-7a2a546c3906',
       hostId: host.id,
-      type: 'APARTMENT',
+      type: 'CREATIVE_STUDIO',
       status: 'PUBLISHED',
-      title: 'Bel appartement dans le Marais',
+      title: 'Studio photo lumineux dans le Marais',
       description:
-        'Appartement lumineux de 45m² au cœur du Marais. Parquet, hauteur sous plafond 3m, cuisine équipée. Idéal pour découvrir Paris à pied.',
+        'Studio photo de 45m² au cœur du Marais. Lumière naturelle, hauteur sous plafond de 3m, fonds et éclairage fournis pour vos séances photo.',
       addressLine1: '12 Rue des Rosiers',
       city: 'Paris',
       postalCode: '75004',
       country: 'FR',
       latitude: 48.8566,
       longitude: 2.3522,
-      maxGuests: 2,
-      pricingUnit: 'NIGHT',
-      basePrice: 120,
+      maxGuests: 6,
+      pricingUnit: 'HOUR',
+      basePrice: 40,
       cleaningFee: 25,
       cancellationPolicy: 'MODERATE',
-      instantBookEnabled: true,
-      amenities: ['wifi', 'kitchen', 'washer', 'heating'],
-      specificAttributes: { floor: 3, elevator: true, balcony: false },
+      instantBookEnabled: false,
+      amenities: ['wifi', 'heating', 'elevator'],
+      specificAttributes: { surface_m2: 45, natural_light: true },
     },
   });
 
@@ -459,30 +458,30 @@ async function main() {
     },
   });
 
-  const house = await prisma.listing.create({
+  const eventSpace = await prisma.listing.create({
     data: {
       hostId: host.id,
-      type: 'HOUSE',
+      type: 'EVENT_SPACE',
       status: 'PUBLISHED',
       verifiedAt: verifiedAt(5),
-      title: 'Maison de charme à Montmartre',
+      title: 'Salle événementielle à Montmartre',
       description:
-        'Petite maison indépendante avec jardinet, à deux pas du Sacré-Cœur. Parfaite pour un séjour au calme en plein Paris.',
+        'Salle indépendante avec jardin, à deux pas du Sacré-Cœur. Un lieu calme pour vos séminaires, ateliers et événements professionnels.',
       addressLine1: '8 Rue Lepic',
       city: 'Paris',
       postalCode: '75018',
       country: 'FR',
       latitude: 48.8867,
       longitude: 2.3431,
-      maxGuests: 6,
-      pricingUnit: 'NIGHT',
-      basePrice: 180,
+      maxGuests: 30,
+      pricingUnit: 'HOUR',
+      basePrice: 80,
       cleaningFee: 40,
       depositAmount: 300,
       cancellationPolicy: 'STRICT',
       instantBookEnabled: true,
-      amenities: ['wifi', 'kitchen', 'heating', 'washer'],
-      specificAttributes: { floor: 0, elevator: false, balcony: true },
+      amenities: ['wifi', 'kitchen', 'heating', 'projector'],
+      specificAttributes: { surface_m2: 90, capacity_persons: 30 },
     },
   });
 
@@ -512,29 +511,29 @@ async function main() {
     },
   });
 
-  const loft = await prisma.listing.create({
+  const shop = await prisma.listing.create({
     data: {
       hostId: host2.id,
-      type: 'APARTMENT',
+      type: 'SHOP',
       status: 'PUBLISHED',
       verifiedAt: verifiedAt(21),
-      title: 'Loft industriel Presqu\'île',
+      title: 'Boutique éphémère Presqu\'île',
       description:
-        'Ancien atelier textile reconverti en loft de 70m², briques apparentes et verrière. À deux pas des berges du Rhône.',
+        'Boutique de 70m² avec vitrine sur rue, briques apparentes et verrière. Idéale pour une vente éphémère ou une présentation de collection.',
       addressLine1: '5 Rue de la République',
       city: 'Lyon',
       postalCode: '69002',
       country: 'FR',
       latitude: 45.7597,
       longitude: 4.8422,
-      maxGuests: 4,
-      pricingUnit: 'NIGHT',
-      basePrice: 95,
+      maxGuests: 20,
+      pricingUnit: 'HOUR',
+      basePrice: 35,
       cleaningFee: 30,
       cancellationPolicy: 'MODERATE',
       instantBookEnabled: true,
-      amenities: ['wifi', 'kitchen', 'heating', 'washer'],
-      specificAttributes: { floor: 2, elevator: false, balcony: false },
+      amenities: ['wifi', 'heating', 'wheelchair-access'],
+      specificAttributes: { surface_m2: 70, floor: 0 },
     },
   });
 
@@ -564,44 +563,45 @@ async function main() {
     },
   });
 
-  const parking = await prisma.listing.create({
+  const restaurant = await prisma.listing.create({
     data: {
       hostId: host3.id,
-      type: 'PARKING',
+      type: 'RESTAURANT',
       status: 'PUBLISHED',
       verifiedAt: verifiedAt(9),
-      title: 'Parking sécurisé Saint-Charles',
+      title: 'Restaurant privatisable Saint-Charles',
       description:
-        'Place de parking couverte et sécurisée à 5 minutes à pied de la gare Saint-Charles. Accès par badge.',
+        'Salle de restaurant à 5 minutes à pied de la gare Saint-Charles. Cuisine équipée et espace convivial pour vos repas et événements professionnels.',
       addressLine1: '1 Boulevard Voltaire',
       city: 'Marseille',
       postalCode: '13001',
       country: 'FR',
       latitude: 43.3038,
       longitude: 5.3805,
-      pricingUnit: 'DAY',
-      basePrice: 12,
+      maxGuests: 40,
+      pricingUnit: 'HOUR',
+      basePrice: 65,
       cancellationPolicy: 'FLEXIBLE',
       instantBookEnabled: true,
-      accessMethod: 'KEY_BOX',
-      accessInstructions: 'Badge dans la boîte à clés murale, code 7734.',
-      amenities: ['covered', 'security-camera'],
-      specificAttributes: { spots: 1, covered: true, ev_charger: false },
+      accessMethod: 'RECEPTION',
+      accessInstructions: "Présentez votre réservation à l'accueil du restaurant.",
+      amenities: ['wifi', 'kitchen', 'ac'],
+      specificAttributes: { surface_m2: 100, capacity_persons: 40 },
     },
   });
 
-  await ensurePhotos(apartment.id, 'APARTMENT', 0);
+  await ensurePhotos(creativeStudio.id, 'CREATIVE_STUDIO', 1);
   await ensurePhotos(meetingRoom.id, 'MEETING_ROOM', 1);
   await ensurePhotos(office.id, 'OFFICE', 0);
-  await ensurePhotos(house.id, 'HOUSE', 0);
+  await ensurePhotos(eventSpace.id, 'EVENT_SPACE', 0);
   await ensurePhotos(workshop.id, 'WORKSHOP', 0);
-  await ensurePhotos(loft.id, 'APARTMENT', 2);
-  await ensurePhotos(cabinet.id, 'OFFICE', 2);
-  await ensurePhotos(parking.id, 'PARKING', 0);
-  console.log('✓ 8 annonces vedettes seedées (3 villes, 4 vérifiées, 4 non vérifiées) + photos + FAQ');
+  await ensurePhotos(shop.id, 'SHOP', 0);
+  await ensurePhotos(cabinet.id, 'PRACTICE_ROOM', 0);
+  await ensurePhotos(restaurant.id, 'RESTAURANT', 0);
+  console.log('✓ 8 annonces vedettes seedées (3 villes, 5 vérifiées, 3 non vérifiées) + photos + FAQ');
 
   // Catalogue de remplissage pour atteindre un volume crédible (recherche,
-  // pagination, filtres) — 16 hôtes "filler-host-*", pas de réservations/avis.
+  // pagination, filtres) — 16 hôtes "filler-host-*", avec historique et avis.
   const FILLER_COUNT = 96;
   const fillerCreated = await generateFillerListings(FILLER_COUNT, hashedPassword);
   console.log(`✓ ${fillerCreated} annonces de remplissage générées (16 hôtes supplémentaires)`);
@@ -683,45 +683,45 @@ async function main() {
     });
   });
 
-  const upcomingHouse = pricing(180, 2, 40);
+  const upcomingEvent = pricing(80, 2, 40);
   await prisma.booking.create({
     data: {
-      listingId: house.id,
+      listingId: eventSpace.id,
       tenantId: tenant.id,
       status: 'CONFIRMED',
-      startAt: atDay(6, 16),
-      endAt: atDay(8, 11),
+      startAt: atDay(6, 14),
+      endAt: atDay(6, 16),
       unitCount: 2,
       guestCount: 2,
       houseRulesAccepted: true,
-      ...upcomingHouse,
+      ...upcomingEvent,
     },
   }).then(async (booking) => {
     await prisma.payment.create({
       data: {
         bookingId: booking.id,
         status: 'CAPTURED',
-        amount: upcomingHouse.totalAmount,
-        platformFee: upcomingHouse.serviceFee,
-        hostPayout: round2(upcomingHouse.totalAmount - upcomingHouse.serviceFee),
+        amount: upcomingEvent.totalAmount,
+        platformFee: upcomingEvent.serviceFee,
+        hostPayout: round2(upcomingEvent.totalAmount - upcomingEvent.serviceFee),
         capturedAt: atDay(-1, 9),
       },
     });
   });
 
-  const pendingApartment = pricing(120, 2, 25);
+  const pendingStudio = pricing(40, 2, 25);
   await prisma.booking.create({
     data: {
-      listingId: apartment.id,
+      listingId: creativeStudio.id,
       tenantId: tenant.id,
       status: 'PENDING',
-      startAt: atDay(12, 15),
-      endAt: atDay(14, 11),
+      startAt: atDay(12, 13),
+      endAt: atDay(12, 15),
       unitCount: 2,
       guestCount: 2,
       houseRulesAccepted: true,
       hostApprovalDeadline: atDay(1, 15),
-      ...pendingApartment,
+      ...pendingStudio,
     },
   });
 
@@ -755,16 +755,16 @@ async function main() {
   });
 
   await seedCompletedWithReview({
-    listingId: apartment.id,
+    listingId: creativeStudio.id,
     hostId: host.id,
     tenantId: reviewer2.id,
-    startAt: atDay(-20, 15),
-    endAt: atDay(-17, 11),
+    startAt: atDay(-20, 9),
+    endAt: atDay(-20, 12),
     unitCount: 3,
-    basePrice: 120,
+    basePrice: 40,
     cleaningFee: 25,
     rating: 5,
-    comment: 'Appartement magnifique, exactement comme les photos, très bien situé.',
+    comment: 'Studio lumineux, matériel photo en très bon état et emplacement pratique.',
   });
 
   await seedCompletedWithReview({
@@ -780,41 +780,41 @@ async function main() {
   });
 
   await seedCompletedWithReview({
-    listingId: house.id,
+    listingId: eventSpace.id,
     hostId: host.id,
     tenantId: reviewer2.id,
-    startAt: atDay(-18, 16),
-    endAt: atDay(-16, 11),
+    startAt: atDay(-18, 13),
+    endAt: atDay(-18, 15),
     unitCount: 2,
-    basePrice: 180,
+    basePrice: 80,
     cleaningFee: 40,
     rating: 5,
-    comment: 'Un vrai coup de cœur, calme absolu à deux pas du Sacré-Cœur.',
+    comment: 'Un cadre calme et agréable pour notre séminaire, à deux pas du Sacré-Cœur.',
   });
 
   await seedCompletedWithReview({
-    listingId: loft.id,
+    listingId: shop.id,
     hostId: host2.id,
     tenantId: reviewer1.id,
-    startAt: atDay(-12, 15),
-    endAt: atDay(-8, 11),
+    startAt: atDay(-12, 9),
+    endAt: atDay(-12, 13),
     unitCount: 4,
-    basePrice: 95,
+    basePrice: 35,
     cleaningFee: 30,
     rating: 3,
     comment: 'Correct mais chauffage capricieux, sinon très bien situé.',
   });
 
   await seedCompletedWithReview({
-    listingId: parking.id,
+    listingId: restaurant.id,
     hostId: host3.id,
     tenantId: reviewer2.id,
-    startAt: atDay(-7, 8),
-    endAt: atDay(-6, 8),
-    unitCount: 1,
-    basePrice: 12,
+    startAt: atDay(-7, 10),
+    endAt: atDay(-7, 12),
+    unitCount: 2,
+    basePrice: 65,
     rating: 5,
-    comment: "Parfait, sécurisé, facile d'accès depuis la gare.",
+    comment: "Très bon accueil pour notre repas d'équipe, facile d'accès depuis la gare.",
   });
 
   console.log('✓ Réservations, avis et encaissements de démo seedés');
@@ -854,7 +854,7 @@ async function main() {
     "✓ Module Commercial seeded (établissement + invitation de démo, token 'seed-demo-invitation-token')",
   );
 
-  console.log('\n✅ Seed terminé !');
+  console.log('\n✓ Données de démo préparées');
   console.log('\nComptes principaux (mot de passe unique) :');
   console.log('  Hôte       → host@aven.dev       / Password123!  (Marie Dupont, Paris — 4 annonces)');
   console.log('  Locataire  → tenant@aven.dev     / Password123!  (Jean Martin — historique + résa en cours)');
@@ -868,11 +868,11 @@ async function main() {
   console.log('\nAnnonces vedettes (avec avis/FAQ/réservations) :');
   console.log(`  Paris     ✓ vérifiée   — Salle de réunion moderne 12 personnes (${meetingRoom.id})`);
   console.log(`  Paris     ✓ vérifiée   — Bureau lumineux Bastille (${office.id})`);
-  console.log(`  Paris     ✓ vérifiée   — Maison de charme à Montmartre (${house.id})`);
-  console.log(`  Paris     · non vérif. — Bel appartement dans le Marais (${apartment.id})`);
-  console.log(`  Lyon      ✓ vérifiée   — Loft industriel Presqu'île (${loft.id})`);
+  console.log(`  Paris     ✓ vérifiée   — Salle événementielle à Montmartre (${eventSpace.id})`);
+  console.log(`  Paris     · non vérif. — Studio photo lumineux dans le Marais (${creativeStudio.id})`);
+  console.log(`  Lyon      ✓ vérifiée   — Boutique éphémère Presqu'île (${shop.id})`);
   console.log(`  Lyon      · non vérif. — Atelier créatif Croix-Rousse (${workshop.id})`);
-  console.log(`  Marseille ✓ vérifiée   — Parking sécurisé Saint-Charles (${parking.id})`);
+  console.log(`  Marseille ✓ vérifiée   — Restaurant privatisable Saint-Charles (${restaurant.id})`);
   console.log(`  Marseille · non vérif. — Cabinet paramédical Vieux-Port (${cabinet.id})`);
   console.log('\nCompte tenant@aven.dev : 1 réservation terminée (avis laissé), 1 confirmée à venir,');
   console.log('1 en attente de validation hôte, 1 annulée — de quoi voir tous les états dans /bookings.');
@@ -880,9 +880,38 @@ async function main() {
   console.log(`\nCompte admin prêt : ${admin.email} (rôle ${admin.roles.join(', ')}).`);
 }
 
+async function main() {
+  await client.$transaction(async (tx) => {
+    prisma = tx;
+    await prisma.$executeRaw`SELECT pg_advisory_xact_lock(20260920, 1)`;
+
+    // Ce seed remplace le catalogue entier : refuser une base devenue réelle.
+    const demoEmail = /^(host[23]?|tenant|reviewer[12]|commercial|admin|moderator|filler-host-\d{2}|filler-reviewer-\d{2})@aven\.dev$/;
+    const users = await prisma.user.findMany({ select: { email: true } });
+    if (users.some((user) => !demoEmail.test(user.email))) {
+      throw new Error('Seed annulé : la base contient des comptes non-démo.');
+    }
+    const stripePayments = await prisma.payment.count({
+      where: { stripePaymentIntentId: { not: null } },
+    });
+    if (stripePayments > 0) {
+      throw new Error('Seed annulé : la base contient des paiements Stripe.');
+    }
+
+    const state = await prisma.featureFlagState.findUnique({ where: { id: 'default' } });
+    const configuredTypes = (state?.flags as { enabledListingTypes?: string[] } | undefined)?.enabledListingTypes;
+    if (configuredTypes && TYPE_TEMPLATES.some((tpl) => !configuredTypes.includes(tpl.type))) {
+      throw new Error('Seed annulé : les catégories de démo ne correspondent pas aux types activés.');
+    }
+
+    await seed();
+  }, { timeout: 300_000 });
+  console.log('\n✅ Seed terminé et transaction validée !');
+}
+
 main()
   .catch((e) => {
     console.error(e);
-    process.exit(1);
+    process.exitCode = 1;
   })
-  .finally(() => prisma.$disconnect());
+  .finally(() => client.$disconnect());
