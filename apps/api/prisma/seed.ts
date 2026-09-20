@@ -126,24 +126,88 @@ const REVIEW_COMMENTS = [
 ];
 const RATING_WEIGHTS = [3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 2];
 
+interface TypeTemplateVariant {
+  title: string;
+  // Sous-catégorie de photo-catalog.ts (PHOTO_CATALOG) — plus précise que le
+  // ListingType seul, pour éviter qu'un "Bureau privé" et un "Espace de
+  // coworking" partagent le même pool d'images générique.
+  photoCategory: string;
+}
+
 interface TypeTemplate {
   type: ListingType;
-  titles: string[];
+  variants: TypeTemplateVariant[];
   pricingUnit: PricingUnit;
   priceRange: [number, number];
-  photoCategory: string;
   maxGuestsRange?: [number, number];
 }
 
 const TYPE_TEMPLATES: TypeTemplate[] = [
-  { type: ListingType.OFFICE, titles: ['Bureau privé', 'Bureau partagé', 'Espace de coworking', 'Bureau design'], pricingUnit: PricingUnit.HOUR, priceRange: [10, 30], photoCategory: 'OFFICE', maxGuestsRange: [1, 8] },
-  { type: ListingType.MEETING_ROOM, titles: ['Salle de réunion', 'Salle de conférence', 'Salle équipée'], pricingUnit: PricingUnit.HOUR, priceRange: [25, 70], photoCategory: 'MEETING_ROOM', maxGuestsRange: [4, 20] },
-  { type: ListingType.WORKSHOP, titles: ["Atelier d'artiste", 'Atelier partagé', 'Espace créatif manuel'], pricingUnit: PricingUnit.HOUR, priceRange: [20, 45], photoCategory: 'WORKSHOP', maxGuestsRange: [2, 12] },
-  { type: ListingType.EVENT_SPACE, titles: ['Salle de réception', 'Loft événementiel', 'Espace pour séminaire'], pricingUnit: PricingUnit.HOUR, priceRange: [40, 120], photoCategory: 'EVENT_SPACE', maxGuestsRange: [10, 150] },
-  { type: ListingType.SHOP, titles: ['Boutique en rez-de-chaussée', 'Local commercial', 'Corner shop éphémère'], pricingUnit: PricingUnit.HOUR, priceRange: [15, 45], photoCategory: 'SHOP', maxGuestsRange: [2, 20] },
-  { type: ListingType.PRACTICE_ROOM, titles: ['Cabinet médical', 'Cabinet paramédical', 'Salle de consultation'], pricingUnit: PricingUnit.HOUR, priceRange: [18, 35], photoCategory: 'PRACTICE_ROOM', maxGuestsRange: [1, 3] },
-  { type: ListingType.RESTAURANT, titles: ['Restaurant privatisable', 'Salle de restaurant', 'Espace traiteur'], pricingUnit: PricingUnit.HOUR, priceRange: [50, 150], photoCategory: 'RESTAURANT', maxGuestsRange: [10, 80] },
-  { type: ListingType.CREATIVE_STUDIO, titles: ['Studio photo', 'Studio créatif', "Studio d'enregistrement"], pricingUnit: PricingUnit.HOUR, priceRange: [25, 60], photoCategory: 'CREATIVE_STUDIO', maxGuestsRange: [1, 10] },
+  {
+    type: ListingType.OFFICE, pricingUnit: PricingUnit.HOUR, priceRange: [10, 30], maxGuestsRange: [1, 8],
+    variants: [
+      { title: 'Bureau privé', photoCategory: 'OFFICE_PRIVATE' },
+      { title: 'Bureau partagé', photoCategory: 'OFFICE_SHARED' },
+      { title: 'Espace de coworking', photoCategory: 'OFFICE_COWORKING' },
+      { title: 'Bureau design', photoCategory: 'OFFICE_DESIGN' },
+    ],
+  },
+  {
+    type: ListingType.MEETING_ROOM, pricingUnit: PricingUnit.HOUR, priceRange: [25, 70], maxGuestsRange: [4, 20],
+    variants: [
+      { title: 'Salle de réunion', photoCategory: 'MEETING_ROOM_STANDARD' },
+      { title: 'Salle de conférence', photoCategory: 'MEETING_ROOM_CONFERENCE' },
+      { title: 'Salle équipée', photoCategory: 'MEETING_ROOM_EQUIPPED' },
+    ],
+  },
+  {
+    type: ListingType.WORKSHOP, pricingUnit: PricingUnit.HOUR, priceRange: [20, 45], maxGuestsRange: [2, 12],
+    variants: [
+      { title: "Atelier d'artiste", photoCategory: 'WORKSHOP_ARTIST' },
+      { title: 'Atelier partagé', photoCategory: 'WORKSHOP_SHARED' },
+      { title: 'Espace créatif manuel', photoCategory: 'WORKSHOP_CREATIVE' },
+    ],
+  },
+  {
+    type: ListingType.EVENT_SPACE, pricingUnit: PricingUnit.HOUR, priceRange: [40, 120], maxGuestsRange: [10, 150],
+    variants: [
+      { title: 'Salle de réception', photoCategory: 'EVENT_RECEPTION' },
+      { title: 'Loft événementiel', photoCategory: 'EVENT_LOFT' },
+      { title: 'Espace pour séminaire', photoCategory: 'EVENT_SEMINAR' },
+    ],
+  },
+  {
+    type: ListingType.SHOP, pricingUnit: PricingUnit.HOUR, priceRange: [15, 45], maxGuestsRange: [2, 20],
+    variants: [
+      { title: 'Boutique en rez-de-chaussée', photoCategory: 'SHOP_BOUTIQUE' },
+      { title: 'Local commercial', photoCategory: 'SHOP_COMMERCIAL' },
+      { title: 'Corner shop éphémère', photoCategory: 'SHOP_POPUP' },
+    ],
+  },
+  {
+    type: ListingType.PRACTICE_ROOM, pricingUnit: PricingUnit.HOUR, priceRange: [18, 35], maxGuestsRange: [1, 3],
+    variants: [
+      { title: 'Cabinet médical', photoCategory: 'PRACTICE_MEDICAL' },
+      { title: 'Cabinet paramédical', photoCategory: 'PRACTICE_PARAMEDICAL' },
+      { title: 'Salle de consultation', photoCategory: 'PRACTICE_CONSULTATION' },
+    ],
+  },
+  {
+    type: ListingType.RESTAURANT, pricingUnit: PricingUnit.HOUR, priceRange: [50, 150], maxGuestsRange: [10, 80],
+    variants: [
+      { title: 'Restaurant privatisable', photoCategory: 'RESTAURANT_PRIVATE' },
+      { title: 'Salle de restaurant', photoCategory: 'RESTAURANT_DINING' },
+      { title: 'Espace traiteur', photoCategory: 'RESTAURANT_CATERING' },
+    ],
+  },
+  {
+    type: ListingType.CREATIVE_STUDIO, pricingUnit: PricingUnit.HOUR, priceRange: [25, 60], maxGuestsRange: [1, 10],
+    variants: [
+      { title: 'Studio photo', photoCategory: 'CREATIVE_PHOTO' },
+      { title: 'Studio créatif', photoCategory: 'CREATIVE_GENERAL' },
+      { title: "Studio d'enregistrement", photoCategory: 'CREATIVE_RECORDING' },
+    ],
+  },
 ];
 
 /** Génère un grand catalogue de remplissage (hôtes "filler-host-*", pas de
@@ -192,7 +256,8 @@ async function generateFillerListings(count: number, hashedPassword: string): Pr
     const city = pick(CITIES);
     const street = pick(STREET_NAMES);
     const houseNumber = randInt(1, 140);
-    const titleBase = pick(tpl.titles);
+    const variant = pick(tpl.variants);
+    const titleBase = variant.title;
     const listingHost = fillerHosts[i % fillerHosts.length];
     const price = randInt(tpl.priceRange[0], tpl.priceRange[1]);
     const isVerified = rng() < 0.45;
@@ -220,7 +285,7 @@ async function generateFillerListings(count: number, hashedPassword: string): Pr
         amenities: shuffle(AMENITY_POOL).slice(0, randInt(2, 5)),
       },
     });
-    await ensurePhotos(listing.id, tpl.photoCategory, i);
+    await ensurePhotos(listing.id, variant.photoCategory, i);
 
     if (status === 'PUBLISHED' && rng() < 0.82) {
       const reviewCount = randInt(1, 5);
@@ -590,14 +655,14 @@ async function seed() {
     },
   });
 
-  await ensurePhotos(creativeStudio.id, 'CREATIVE_STUDIO', 1);
-  await ensurePhotos(meetingRoom.id, 'MEETING_ROOM', 1);
-  await ensurePhotos(office.id, 'OFFICE', 0);
-  await ensurePhotos(eventSpace.id, 'EVENT_SPACE', 0);
-  await ensurePhotos(workshop.id, 'WORKSHOP', 0);
-  await ensurePhotos(shop.id, 'SHOP', 0);
-  await ensurePhotos(cabinet.id, 'PRACTICE_ROOM', 0);
-  await ensurePhotos(restaurant.id, 'RESTAURANT', 0);
+  await ensurePhotos(creativeStudio.id, 'CREATIVE_PHOTO', 1);
+  await ensurePhotos(meetingRoom.id, 'MEETING_ROOM_EQUIPPED', 1);
+  await ensurePhotos(office.id, 'OFFICE_PRIVATE', 0);
+  await ensurePhotos(eventSpace.id, 'EVENT_RECEPTION', 0);
+  await ensurePhotos(workshop.id, 'WORKSHOP_CREATIVE', 0);
+  await ensurePhotos(shop.id, 'SHOP_POPUP', 0);
+  await ensurePhotos(cabinet.id, 'PRACTICE_PARAMEDICAL', 0);
+  await ensurePhotos(restaurant.id, 'RESTAURANT_PRIVATE', 0);
   console.log('✓ 8 annonces vedettes seedées (3 villes, 5 vérifiées, 3 non vérifiées) + photos + FAQ');
 
   // Catalogue de remplissage pour atteindre un volume crédible (recherche,
