@@ -2,6 +2,7 @@ node_modules/
 dist/
 apps/api/uploads/
 .next/
+.next-preview/
 coverage/
 *.tsbuildinfo
 

@@ -6,6 +6,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { cleanListingDescription } from './listing-copy.util';
 import { extname } from 'path';
 import { ListingStatus, BookingStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@/infrastructure/database/prisma.service';
@@ -60,7 +61,7 @@ export class ListingsService {
         hostId: currentUser.id,
         type: dto.type,
         title: dto.title,
-        description: dto.description,
+        description: cleanListingDescription(dto.description, dto.addressLine1, dto.addressLine2),
         addressLine1: dto.addressLine1,
         addressLine2: dto.addressLine2,
         city: dto.city,
@@ -175,7 +176,7 @@ export class ListingsService {
       data: {
         ...(dto.type !== undefined && { type: dto.type }),
         ...(dto.title !== undefined && { title: dto.title }),
-        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.description !== undefined && { description: cleanListingDescription(dto.description, dto.addressLine1 ?? listing.addressLine1, dto.addressLine2 ?? listing.addressLine2) }),
         ...(dto.addressLine1 !== undefined && { addressLine1: dto.addressLine1 }),
         ...(dto.addressLine2 !== undefined && { addressLine2: dto.addressLine2 }),
         ...(dto.city !== undefined && { city: dto.city }),
@@ -528,7 +529,7 @@ export class ListingsService {
       status: listing.status,
       verifiedAt: listing.verifiedAt ?? null,
       title: listing.title,
-      description: listing.description,
+      description: cleanListingDescription(listing.description, listing.addressLine1, listing.addressLine2),
       addressLine1: listing.addressLine1,
       addressLine2: listing.addressLine2,
       city: listing.city,

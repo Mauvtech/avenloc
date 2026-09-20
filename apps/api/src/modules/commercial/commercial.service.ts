@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
+import { cleanListingDescription } from '@/modules/listings/listing-copy.util';
 import { PrismaService } from '@/infrastructure/database/prisma.service';
 import { AuthService } from '@/modules/auth/auth.service';
 import type { CreateLeadDto } from './dto/create-lead.dto';
@@ -39,14 +40,21 @@ export class CommercialService {
    */
   async createLead(dto: CreateLeadDto, commercial: AuthenticatedUser) {
     return this.prisma.$transaction(async (tx) => {
-      let host = await tx.user.findUnique({ where: { email: dto.host.email } });
+      const email = dto.host.email?.trim().toLowerCase();
+      const phone = dto.host.phone?.replace(/[\s().-]/g, '');
+      if (!email && !phone) throw new BadRequestException("Un email ou un téléphone est requis pour l'hôte");
+      let host = email
+        ? await tx.user.findUnique({ where: { email } })
+        : await tx.user.findFirst({ where: { phone } });
       if (!host) {
         host = await tx.user.create({
           data: {
-            email: dto.host.email,
+            // Identifiant interne uniquement : l'invitation se transmet par lien
+            // quand le contact n'a fourni qu'un téléphone.
+            email: email || `invitation-${randomBytes(16).toString('hex')}@aven.invalid`,
             firstName: dto.host.firstName,
             lastName: dto.host.lastName,
-            phone: dto.host.phone,
+            phone,
             roles: ['HOST'],
           },
         });
@@ -94,7 +102,7 @@ export class CommercialService {
           status: 'PENDING_VALIDATION',
           type: dto.listing.type,
           title: dto.listing.title,
-          description: dto.listing.description,
+          description: cleanListingDescription(dto.listing.description, dto.listing.addressLine1, dto.listing.addressLine2),
           addressLine1: dto.listing.addressLine1,
           addressLine2: dto.listing.addressLine2,
           city: dto.listing.city,
@@ -132,10 +140,10 @@ export class CommercialService {
           establishmentId: establishment.id,
           listingId: listing.id,
           commercialId: commercial.id,
-          hostEmail: dto.host.email,
+          hostEmail: email || (host.email.endsWith('@aven.invalid') ? '' : host.email),
           hostFirstName: dto.host.firstName,
           hostLastName: dto.host.lastName,
-          hostPhone: dto.host.phone,
+          hostPhone: phone,
           token,
         },
       });
@@ -179,6 +187,17 @@ export class CommercialService {
       throw new BadRequestException('Cette invitation a déjà été utilisée ou a expiré');
     }
 
+    const email = !invitation.hostEmail ? dto.email?.trim().toLowerCase() : undefined;
+    if (!invitation.hostEmail && !email) {
+      throw new BadRequestException('Renseignez votre email pour pouvoir vous reconnecter à votre compte.');
+    }
+    if (email) {
+      const existing = await this.prisma.user.findUnique({ where: { email } });
+      if (existing && existing.id !== invitation.establishment.hostId) {
+        throw new BadRequestException('Cet email est déjà utilisé par un autre compte.');
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
 
     const host = await this.prisma.$transaction(async (tx) => {
@@ -194,7 +213,7 @@ export class CommercialService {
       }
       return tx.user.update({
         where: { id: invitation.establishment.hostId },
-        data: { hashedPassword },
+        data: { hashedPassword, ...(email ? { email } : {}) },
       });
     });
 

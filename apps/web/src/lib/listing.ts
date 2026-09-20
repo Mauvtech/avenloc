@@ -4,8 +4,10 @@ export const TYPE_LABEL: Record<string, string> = {
   APARTMENT: 'Appartement',
   HOUSE: 'Maison',
   ROOM: 'Chambre',
-  OFFICE: 'Bureau',
+  OFFICE: 'Bureau privé',
   MEETING_ROOM: 'Salle de réunion',
+  TRAINING_ROOM: 'Salle de formation',
+  VACANT_CHAIR: 'Fauteuil vacant',
   WORKSHOP: 'Atelier',
   WAREHOUSE: 'Entrepôt',
   EVENT_SPACE: 'Espace événementiel',
@@ -18,6 +20,11 @@ export const TYPE_LABEL: Record<string, string> = {
 };
 
 export const LISTING_TYPES = Object.keys(TYPE_LABEL);
+
+export const PROTOTYPE_TYPE_OPTIONS = [
+  'MEETING_ROOM', 'OFFICE', 'TRAINING_ROOM', 'VACANT_CHAIR', 'SHOP',
+  'PRACTICE_ROOM', 'RESTAURANT', 'CREATIVE_STUDIO', 'WORKSHOP', 'EVENT_SPACE',
+].map((value) => ({ value, label: value === 'EVENT_SPACE' ? 'Salle événementiel' : TYPE_LABEL[value] }));
 
 // Ordre d'affichage sur la page d'accueil (types les plus demandés en premier).
 export const BROWSE_TYPES = [

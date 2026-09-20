@@ -165,3 +165,16 @@
 @media (max-width:420px) { .marketplace-grid { grid-template-columns: minmax(0,1fr); } }
 
 @media (max-width:380px) { .role-switcher a { padding-inline: 8px; font-size: 12px; } }
+
+/* Dispositions des composants repris du prototype de septembre 2026. */
+.mkt-stat-row { flex-wrap: wrap; }
+.mkt-photo-thumbs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.mkt-form-row-3 > div { min-width: 0; }
+@media (max-width: 900px) {
+  .mkt-two-col-equal, .mkt-calendar-split { grid-template-columns: minmax(0, 1fr) !important; }
+}
+@media (max-width: 640px) {
+  .mkt-photo-thumbs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mkt-form-row-3 { flex-direction: column !important; }
+  .mkt-stat-row > div { min-width: 140px; }
+}

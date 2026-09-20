@@ -1,161 +1,108 @@
+
 'use client';
-
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { api, type ConnectStatus } from '@/lib/api';
-import { PageHeader, PageLoader } from '@/components/ui';
-import { computeHostStats, fmtEUR, fmtEUR2 } from '@/lib/host-stats';
+import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
+import { PageLoader } from '@/components/ui';
+import HostCalendar from '@/components/host-calendar';
+import { computeHostStats, fmtEUR } from '@/lib/host-stats';
+import { parisDay } from '@/lib/host-calendar';
 import { useHostGuard } from './use-host-guard';
-import type { Booking, Listing } from '@/lib/types';
-
+import type { Booking, Listing, Review } from '@/lib/types';
+const BORDER = '#E7E7E7', INK = '#14171A', GRAY = '#6B7280';
+function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return <div style={{ border: `1px solid ${BORDER}`, borderRadius: 12, padding: 18, flex: 1 }}>
+    <div style={{ fontSize: 13, color: GRAY }}>{label}</div>
+    <div style={{ fontSize: 22, fontWeight: 700, color: INK, marginTop: 6 }}>{value}</div>
+    {sub && <div style={{ fontSize: 12, color: GRAY, marginTop: 4 }}>{sub}</div>}
+  </div>;
+}
 export default function HostDashboardPage() {
   const { ready } = useHostGuard();
+  const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [spaces, setSpaces] = useState<Listing[]>([]);
-  const [connect, setConnect] = useState<ConnectStatus | null>(null);
-  const [connectChecked, setConnectChecked] = useState(false);
-  const [onboarding, setOnboarding] = useState(false);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     if (!ready) return;
-    Promise.all([
-      api.bookings.asHost().catch(() => [] as Booking[]),
-      api.payments.connectStatus().catch(() => null),
-      api.listings.mine().catch(() => [] as Listing[]),
-    ])
-      .then(([bs, cs, ls]) => {
-        setSpaces(ls);
-        setBookings(bs);
-        setConnect(cs);
-        setConnectChecked(true);
-      })
+    Promise.all([api.bookings.asHost(), api.listings.mine(), api.reviews.byHost()])
+      .then(([bookings, spaces, reviews]) => { setBookings(bookings); setSpaces(spaces); setReviews(reviews); })
+      .catch(() => setError('Impossible de charger le tableau de bord. Rechargez la page.'))
       .finally(() => setLoading(false));
   }, [ready]);
-
-  async function startOnboarding() {
-    setOnboarding(true);
-    setError(null);
-    try {
-      const { url } = await api.payments.onboard();
-      window.location.href = url;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Impossible de démarrer la configuration.');
-      setOnboarding(false);
-    }
-  }
-
   const stats = useMemo(() => computeHostStats(bookings), [bookings]);
-
   if (!ready || loading) return <PageLoader />;
-
-  const now = new Date();
-  const today = bookings.filter((b) => b.status !== 'CANCELLED' && new Date(b.startAt).toDateString() === now.toDateString());
-  const occupied = new Set(bookings.filter((b) => b.status === 'CONFIRMED' && new Date(b.startAt) <= now && new Date(b.endAt) > now).map((b) => b.listingId)).size;
-  const nextArrival = today.filter((b) => b.status === 'CONFIRMED' && new Date(b.startAt) > now).sort((a,b) => a.startAt.localeCompare(b.startAt))[0];
-  const monthCount = bookings.filter((b) => b.status !== 'CANCELLED' && new Date(b.startAt).getMonth() === now.getMonth() && new Date(b.startAt).getFullYear() === now.getFullYear()).length;
-  const firstSpace = spaces.find((s) => s.status === 'PUBLISHED') ?? spaces[0];
-  const active = connect?.connected && connect.status === 'active';
-  const connectPending = connect?.connected && connect.status !== 'active';
-
+  if (error) return <p role="alert" className="text-sm text-danger-fg">{error}</p>;
+  const now = new Date(), todayKey = parisDay(now.toISOString());
+  const today = bookings.filter((booking) => booking.status !== 'CANCELLED' && parisDay(booking.startAt) === todayKey);
+  const occupied = new Set(bookings.filter((booking) => booking.status === 'CONFIRMED' && new Date(booking.startAt) <= now && new Date(booking.endAt) > now).map((booking) => booking.listingId)).size;
+  const nextArrival = today.filter((booking) => booking.status === 'CONFIRMED' && new Date(booking.startAt) > now).sort((a,b) => a.startAt.localeCompare(b.startAt))[0];
+  const monthCount = bookings.filter((booking) => booking.status !== 'CANCELLED' && parisDay(booking.startAt).slice(0,7) === todayKey.slice(0,7)).length;
+  const firstSpace = spaces.find((space) => space.status === 'PUBLISHED') ?? spaces[0];
+  const onModifierDispo = () => router.push(firstSpace ? `/listings/${firstSpace.id}/calendar` : '/host/spaces');
+  const onModifierPrix = () => router.push(firstSpace ? `/listings/${firstSpace.id}/edit` : '/host/spaces');
+  const onModifierEspace = onModifierPrix;
+  const onVoirReservations = () => router.push('/host/reservations');
+  const events = [
+    ...bookings.map((booking) => ({ text: `Nouvelle réservation · ${booking.listing?.title ?? 'Espace'} · ${fmtEUR(booking.totalAmount)}`, date: booking.createdAt, href: '/host/reservations' })),
+    ...spaces.filter((space) => space.status === 'PENDING_VALIDATION').map((space) => ({ text: `Fiche « ${space.title} » créée par un commercial, en attente de votre validation`, date: space.createdAt, href: `/listings/${space.id}/edit` })),
+    ...reviews.map((review) => ({ text: `Avis reçu (${review.rating}★) · ${review.listingTitle ?? 'Espace'}`, date: review.createdAt, href: '/host/reviews' })),
+  ];
+  const notifications = events.sort((a,b) => b.date.localeCompare(a.date)).slice(0,4).map((event) => ({ ...event, time: new Date(event.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) }));
   return (
-    <div className="space-y-8">
-      <PageHeader title="Bonjour 👋" />
-      <section>
-        <h2 className="section-title mb-3">Aujourd’hui</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Kpi label="Réservations" value={String(today.length)} />
-          <Kpi label="Espaces occupés" value={`${occupied} / ${spaces.filter((s) => s.status === 'PUBLISHED').length}`} />
-          <Kpi label="Prochaine arrivée" value={nextArrival ? new Date(nextArrival.startAt).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : '—'} hint={nextArrival?.listing?.title} />
-        </div>
-      </section>
-      <section>
-        <h2 className="section-title mb-3">Ce mois-ci</h2>
-        <div className="grid grid-cols-2 gap-4"><Kpi label="Revenu net" value={fmtEUR(stats.revenueMonth)} /><Kpi label="Réservations" value={String(monthCount)} /></div>
-      </section>
-      <div className="grid gap-8 min-[901px]:grid-cols-2">
-        <section><h2 className="section-title mb-3">Actions</h2><div className="flex flex-wrap gap-3">
-          <Link className="btn-ghost text-[13px] font-normal" href={firstSpace ? `/listings/${firstSpace.id}/calendar` : '/host/spaces'}>Modifier disponibilité</Link>
-          <Link className="btn-ghost text-[13px] font-normal" href={firstSpace ? `/listings/${firstSpace.id}/edit` : '/host/spaces'}>Modifier prix</Link>
-          <Link className="btn-ghost text-[13px] font-normal" href="/host/spaces">Modifier un espace</Link>
-          <Link className="btn-ghost text-[13px] font-normal" href="/host/reservations">Voir les réservations</Link>
-        </div></section>
-        <section><h2 className="section-title mb-3">Réservations récentes</h2><div className="card divide-y divide-line">
-          {bookings.length ? [...bookings].sort((a,b) => b.createdAt.localeCompare(a.createdAt)).slice(0,4).map((b) => <Link key={b.id} href="/host/reservations" className="block px-4 py-3 hover:bg-canvas"><p className="text-[13px]">{b.listing?.title ?? 'Réservation'} — {fmtEUR(b.totalAmount)}</p><p className="mt-1 text-xs text-muted">{new Date(b.startAt).toLocaleDateString('fr-FR')}</p></Link>) : <p className="px-4 py-3 text-[13px] text-muted">Aucune réservation pour le moment.</p>}
-        </div></section>
+    <div>
+      <h1 style={{ fontSize: 22, fontWeight: 700, color: INK, marginBottom: 24 }}>Bonjour 👋</h1>
+
+      <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 12 }}>Aujourd'hui</div>
+      <div className="mkt-stat-row" style={{ display: "flex", gap: 16, marginBottom: 32 }}>
+        <StatCard label="Réservations" value={String(today.length)} />
+        <StatCard label="Espaces occupés" value={`${occupied} / ${spaces.filter((space) => space.status === "PUBLISHED").length}`} />
+        <StatCard label="Prochaine arrivée" value={nextArrival ? new Date(nextArrival.startAt).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" }).replace(":", "h") : "Aucune"} sub={nextArrival?.listing?.title} />
       </div>
 
-      {/* Encaissements Stripe */}
-      {connectChecked &&
-        (active ? (
-          <div className="rounded-lg border border-success/30 bg-success-tint p-3 text-sm text-success-fg">
-            <span className="font-semibold">✓ Encaissements activés</span>
-            {connect?.last4 && (
-              <span>
-                {' '}— IBAN •••• <span className="font-mono font-semibold">{connect.last4}</span>
-                {connect.holderName ? ` · ${connect.holderName}` : ''}
-              </span>
-            )}
-            <button onClick={startOnboarding} disabled={onboarding} className="ml-2 font-semibold underline">
-              Gérer
+      <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 12 }}>Ce mois-ci</div>
+      <div className="mkt-stat-row" style={{ display: "flex", gap: 16, marginBottom: 32 }}>
+        <StatCard label="Revenu net" value={fmtEUR(stats.revenueMonth)} />
+        <StatCard label="Réservations" value={String(monthCount)} />
+      </div>
+
+      <div className="mkt-two-col-equal" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 12 }}>Actions</div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <button type="button" onClick={onModifierDispo} style={{ border: `1px solid ${BORDER}`, background: "white", borderRadius: 8, padding: "10px 16px", fontSize: 13, color: INK, cursor: "pointer" }}>
+              Modifier disponibilité
+            </button>
+            <button type="button" onClick={onModifierPrix} style={{ border: `1px solid ${BORDER}`, background: "white", borderRadius: 8, padding: "10px 16px", fontSize: 13, color: INK, cursor: "pointer" }}>
+              Modifier prix
+            </button>
+            <button type="button" onClick={onModifierEspace} style={{ border: `1px solid ${BORDER}`, background: "white", borderRadius: 8, padding: "10px 16px", fontSize: 13, color: INK, cursor: "pointer" }}>
+              Modifier un espace
+            </button>
+            <button type="button" onClick={onVoirReservations} style={{ border: `1px solid ${BORDER}`, background: "white", borderRadius: 8, padding: "10px 16px", fontSize: 13, color: INK, cursor: "pointer" }}>
+              Voir les réservations
             </button>
           </div>
-        ) : (
-          <div className="card space-y-3 p-4">
-            <div className="text-sm font-bold">Configurez vos encaissements</div>
-            <p className="text-sm text-muted">
-              {connectPending
-                ? 'Stripe vérifie encore vos informations.'
-                : 'Obligatoire avant de recevoir des réservations. Identité + IBAN saisis sur une page Stripe.'}
-            </p>
-            <button onClick={startOnboarding} disabled={onboarding} className="btn-primary">
-              {onboarding
-                ? 'Redirection…'
-                : connectPending
-                  ? 'Reprendre la configuration'
-                  : 'Configurer mes encaissements'}
-            </button>
+        </div>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 12 }}>Notifications récentes</div>
+          <div style={{ border: `1px solid ${BORDER}`, borderRadius: 12, overflow: "hidden" }}>
+            {notifications.length === 0 && <p className="px-4 py-3 text-[13px] text-muted">Aucune notification pour le moment.</p>}
+            {notifications.map((n, i, arr) => (
+              <div key={i} onClick={() => router.push(n.href)} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") router.push(n.href); }} style={{ padding: "12px 16px", borderTop: i > 0 ? `1px solid ${BORDER}` : "none", cursor: "pointer" }}>
+                <div style={{ fontSize: 13, color: INK }}>{n.text}</div>
+                <div style={{ fontSize: 11, color: GRAY, marginTop: 3 }}>{n.time}</div>
+              </div>
+            ))}
           </div>
-        ))}
-
-      {error && <p className="text-sm text-danger-fg">{error}</p>}
-
-      {/* KPIs */}
-      <section>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Kpi label="Revenus nets" value={fmtEUR(stats.revenueNet)} hint="Confirmées + terminées" />
-          <Kpi label="Ce mois-ci" value={fmtEUR(stats.revenueMonth)} hint="Créneaux démarrant ce mois" />
-          <Kpi
-            label="À venir"
-            value={fmtEUR(stats.upcomingRevenue)}
-            hint={`${stats.nightsUpcoming} réservation(s) à venir`}
-          />
-          <Kpi label="Panier moyen" value={stats.avgBasket ? fmtEUR(stats.avgBasket) : '—'} hint="Par réservation" />
         </div>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-          <span>{stats.counts.total} réservation(s)</span>
-          <span>· {stats.counts.pending} en attente</span>
-          <span>· {stats.counts.confirmed} confirmée(s)</span>
-          <span>· {stats.counts.completed} terminée(s)</span>
-          <span>· {stats.counts.cancelled} annulée(s)</span>
-          {stats.confirmationRate !== null && (
-            <span>· {Math.round(stats.confirmationRate * 100)}% de confirmation</span>
-          )}
-          <span>· commission Aven : {fmtEUR2(stats.platformFees)}</span>
-        </div>
-      </section>
-    </div>
-  );
-}
+      </div>
 
-// Reprend StatCard du prototype : bordure fine, radius 12, aucune ombre ni accent coloré.
-function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded-lg border border-line bg-surface p-[18px]">
-      <div className="text-[13px] text-muted">{label}</div>
-      <div className="mt-1.5 text-[22px] font-bold tracking-tight">{value}</div>
-      {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
+      <div style={{ marginTop: 32, borderTop: `1px solid ${BORDER}`, paddingTop: 28 }}>
+        <HostCalendar bookings={bookings} spaces={spaces} />
+      </div>
     </div>
   );
 }

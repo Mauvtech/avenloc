@@ -1,5 +1,7 @@
 'use client';
 
+import ListingRating from '@/components/listing-rating';
+
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -164,12 +166,7 @@ export default function ListingPage() {
         </div>
         <div className="flex flex-wrap items-center gap-5 text-sm text-muted">
           {listing.maxGuests != null && <span>{listing.maxGuests} {capacityNoun(listing.type)}</span>}
-          {rating !== null && (
-            <span>
-              ★ {rating.toFixed(1)}
-              {reviews && reviews.total > 0 && ` (${reviews.total} avis)`}
-            </span>
-          )}
+          <ListingRating rating={rating} count={reviews?.total} showCount />
           <span>{listing.city}</span>
         </div>
       </div>
@@ -359,9 +356,7 @@ export default function ListingPage() {
                 <span className="text-xl font-extrabold">{eurRound(listing.basePrice)}</span>
                 <span className="text-sm text-muted"> / {unit}</span>
               </div>
-              {rating !== null && (
-                <span className="text-sm font-semibold">★ {rating.toFixed(1)}</span>
-              )}
+              <ListingRating rating={rating} count={reviews?.total} />
             </div>
 
             {isOwner ? (

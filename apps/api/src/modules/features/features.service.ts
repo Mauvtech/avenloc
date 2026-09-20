@@ -32,6 +32,8 @@ export interface FeatureFlags extends Record<FeatureKey, boolean> {
 const DEFAULT_ENABLED_LISTING_TYPES = [
   'OFFICE',
   'MEETING_ROOM',
+  'TRAINING_ROOM',
+  'VACANT_CHAIR',
   'WORKSHOP',
   'EVENT_SPACE',
   'SHOP',

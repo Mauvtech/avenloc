@@ -1,8 +1,9 @@
-import { IsEmail, IsString, IsOptional, IsUUID, ValidateNested, MaxLength } from 'class-validator';
+import { IsEmail, IsString, IsOptional, IsUUID, ValidateNested, MaxLength, ValidateIf, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateListingDto } from '@/modules/listings/dto/create-listing.dto';
 
 export class LeadHostDto {
+  @ValidateIf((host: LeadHostDto) => Boolean(host.email) || !host.phone)
   @IsEmail()
   email: string = '';
 
@@ -14,9 +15,10 @@ export class LeadHostDto {
   @MaxLength(100)
   lastName: string = '';
 
-  @IsOptional()
+  @ValidateIf((host: LeadHostDto) => Boolean(host.phone) || !host.email)
   @IsString()
   @MaxLength(30)
+  @Matches(/^(?=(?:\D*\d){8,15}\D*$)\+?[\d\s().-]+$/)
   phone?: string;
 }
 

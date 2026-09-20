@@ -18,7 +18,7 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: 'Sppot by Aven — Trouvez votre espace de travail',
   description:
-    'Appartements, bureaux, salles de réunion, ateliers, entrepôts et parkings — à réserver en quelques clics.',
+    'Bureaux, salles de réunion, ateliers et espaces professionnels à réserver à l’heure.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

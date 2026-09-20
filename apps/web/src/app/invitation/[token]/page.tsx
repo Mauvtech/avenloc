@@ -15,6 +15,7 @@ export default function InvitationPage() {
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -40,7 +41,7 @@ export default function InvitationPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const tokens = await api.commercial.acceptInvitation(token, password);
+      const tokens = await api.commercial.acceptInvitation(token, password, invitation?.hostEmail ? undefined : email.trim());
       saveTokens(tokens.accessToken, tokens.refreshToken);
       router.push('/host/spaces');
     } catch (err) {
@@ -83,8 +84,10 @@ export default function InvitationPage() {
 
       <form onSubmit={handleSubmit} className="card space-y-4 p-5">
         <div>
-          <label className="label">Email</label>
-          <input value={invitation.hostEmail} disabled className="field opacity-60" />
+          <label htmlFor="invitation-email" className="label">Email</label>
+          <input id="invitation-email" type="email" required value={invitation.hostEmail || email}
+            disabled={Boolean(invitation.hostEmail)} onChange={(event) => setEmail(event.target.value)} className={`field ${invitation.hostEmail ? 'opacity-60' : ''}`} />
+          {!invitation.hostEmail && <p className="mt-1 text-xs text-muted">Cet email vous permettra de vous reconnecter à votre compte.</p>}
         </div>
         <div>
           <label className="label">Mot de passe</label>

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { api, type PaymentHistoryItem, type ConnectStatus } from '@/lib/api';
 import { EmptyState, PageHeader, PageLoader } from '@/components/ui';
 import { downloadInvoice } from '@/lib/invoice';
@@ -24,6 +23,13 @@ export default function HostFinancesPage() {
   const [connect, setConnect] = useState<ConnectStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [onboarding, setOnboarding] = useState(false);
+
+  async function managePayments() {
+    setOnboarding(true);
+    try { window.location.href = (await api.payments.onboard()).url; }
+    catch (error) { toast.error(error instanceof Error ? error.message : 'Configuration indisponible'); setOnboarding(false); }
+  }
 
   useEffect(() => {
     if (!ready) return;
@@ -79,9 +85,9 @@ export default function HostFinancesPage() {
               : 'Non configurés'}
           </p>
         </div>
-        <Link href="/host" className="btn-ghost">
-          Gérer sur le tableau de bord
-        </Link>
+        <button type="button" onClick={managePayments} disabled={onboarding} className="btn-ghost">
+          {onboarding ? 'Redirection…' : connect?.status === 'active' ? 'Gérer mes encaissements' : 'Configurer mes encaissements'}
+        </button>
       </div>
 
       <p className="section-title mb-3">Historique des reversements</p>

@@ -174,6 +174,10 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ date, isAvailable }),
       }),
+    blockSlot: (id: string, date: string, startTime: string, endTime: string) =>
+      apiFetch<ListingAvailability>(`/listings/${id}/availability`, {
+        method: 'POST', body: JSON.stringify({ date, startTime, endTime, isAvailable: false }),
+      }),
     unblock: (id: string, availId: string) =>
       apiFetch<void>(`/listings/${id}/availability/${availId}`, { method: 'DELETE' }),
     // FAQ par annonce
@@ -316,10 +320,10 @@ export const api = {
     history: () => apiFetch<HostInvitation[]>('/commercial/history'),
     invitationPreview: (token: string) =>
       apiFetch<HostInvitation>(`/commercial/invitations/${token}`),
-    acceptInvitation: (token: string, password: string) =>
+    acceptInvitation: (token: string, password: string, email?: string) =>
       apiFetch<TokenResponse>(`/commercial/invitations/${token}/accept`, {
         method: 'POST',
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password, email }),
       }),
   },
 };

@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import MonthCalendar from '@/components/month-calendar';
-import { daysBetween } from '@/lib/calendar';
+import MiniCalendar from '@/components/mini-calendar';
 import { dateShort } from '@/lib/format';
 
 interface Props {
@@ -11,74 +10,37 @@ interface Props {
   onChange: (range: { startDate: string; endDate: string }) => void;
 }
 
-// Sélecteur de plage de dates sans contrainte de disponibilité (page d'accueil).
-export default function DateRangeField({ startDate, endDate, onChange }: Props) {
+export default function DateRangeField({ startDate, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
+  const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    function onDoc(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    if (!open) return;
+    function outside(event: MouseEvent) {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
     }
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, []);
-
-  const selected =
-    startDate && endDate ? new Set(daysBetween(startDate, endDate)) : new Set<string>();
-
-  function pick(iso: string) {
-    if (!startDate || (startDate && endDate) || iso <= startDate) {
-      onChange({ startDate: iso, endDate: '' });
-    } else {
-      onChange({ startDate, endDate: iso });
-      setOpen(false);
+    function escape(event: KeyboardEvent) {
+      if (event.key === 'Escape') { setOpen(false); trigger.current?.focus(); }
     }
-  }
-
-  const label =
-    startDate && endDate
-      ? `${dateShort(startDate)} → ${dateShort(endDate)}`
-      : startDate
-        ? `${dateShort(startDate)} → …`
-        : '\u00a0';
+    document.addEventListener('mousedown', outside);
+    document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('mousedown', outside); document.removeEventListener('keydown', escape); };
+  }, [open]);
 
   return (
     <div ref={ref} className="relative">
-      <div className="field flex items-center justify-between p-0">
-        <button
-          type="button"
-          aria-label="Choisir les dates"
-          aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
-          className="flex-1 px-3 py-2.5 text-left"
-        >
-          <span className={startDate ? 'text-ink' : 'text-muted/70'}>{label}</span>
+      <div className="flex items-center justify-between">
+        <button ref={trigger} type="button" aria-label="Choisir les dates" aria-expanded={open} aria-haspopup="dialog"
+          onClick={() => setOpen(!open)} className={`min-h-6 flex-1 py-0.5 text-left text-sm ${open ? 'font-semibold text-brand' : 'text-ink'}`}>
+          {startDate ? dateShort(startDate) : '\u00a0'}
         </button>
-        {startDate && (
-          <button
-            type="button"
-            onClick={() => onChange({ startDate: '', endDate: '' })}
-            className="px-3 text-muted hover:text-ink"
-            aria-label="Effacer les dates"
-          >
-            ✕
-          </button>
-        )}
+        {startDate && <button type="button" onClick={() => onChange({ startDate: '', endDate: '' })} aria-label="Effacer les dates" className="text-xs text-muted">✕</button>}
       </div>
-      {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 w-[min(20rem,90vw)] rounded-lg border border-line bg-surface p-3 shadow-modal">
-          <MonthCalendar
-            months={2}
-            onDayClick={pick}
-            dayClassName={(iso) => {
-              if (iso === startDate || iso === endDate) return 'bg-ink text-white font-semibold';
-              if (selected.has(iso)) return 'bg-canvas text-ink';
-              return '';
-            }}
-          />
-        </div>
-      )}
+      {open && <div role="dialog" aria-label="Quand ?" className="absolute left-0 top-full z-50 mt-2 w-[300px] max-w-[calc(100vw-4rem)] rounded-[10px] bg-white shadow-modal">
+        <MiniCalendar value={startDate} onChange={(date) => {
+          onChange({ startDate: date, endDate: date }); setOpen(false); trigger.current?.focus();
+        }} />
+      </div>}
     </div>
   );
 }

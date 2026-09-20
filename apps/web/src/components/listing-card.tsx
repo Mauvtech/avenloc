@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import ListingRating from '@/components/listing-rating';
 import VerificationBadge from '@/components/verification-badge';
 import WishlistButton from '@/components/wishlist-button';
 import { eurRound } from '@/lib/format';
@@ -23,7 +24,7 @@ export default function ListingCard({ listing }: { listing: SearchResultItem }) 
 
       <div className="mt-2.5 flex items-start justify-between gap-2">
         <h3 className="line-clamp-1 text-sm font-semibold">{listing.title}</h3>
-        {listing.rating !== null && <span className="flex-none text-[13px] text-ink">★ {listing.rating.toFixed(1)}</span>}
+        <ListingRating rating={listing.rating} count={listing.reviewCount} />
       </div>
       <p className="mt-0.5 text-[13px] text-muted">
         {typeLabel(listing.type)}
