@@ -28,6 +28,20 @@
     box-shadow: theme('boxShadow.focus');
     border-radius: 4px;
   }
+  /* Chevron custom sur tous les <select> — sans ça, le navigateur affiche sa
+     flèche par défaut (variable selon l'OS), qui détonne avec le design plat
+     du reste de l'app. `padding-right` en !important : plusieurs selects
+     fixent leur padding en style inline, qui gagnerait sinon sur cette règle. */
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: #fff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px !important;
+    cursor: pointer;
+  }
 }
 
 @layer components {
