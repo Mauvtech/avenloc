@@ -16,12 +16,12 @@ import {
   CANCELLATION_LABEL,
   CANCELLATION_POLICIES,
   capacityNoun,
-  LISTING_TYPES,
   PRICING_UNITS,
   UNIT_LABEL_SHORT,
   WEEKDAY_LABEL,
   typeLabel,
 } from '@/lib/listing';
+import { useEnabledListingTypes } from '@/lib/use-enabled-listing-types';
 
 const STEPS = ['Type & description', 'Localisation', 'Prix & détails', 'Conditions', 'Photos'];
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0];
@@ -30,12 +30,13 @@ export default function NewListingPage() {
   const router = useRouter();
   const pathname = usePathname();
   const toast = useToast();
+  const listingTypes = useEnabledListingTypes();
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
-    type: 'APARTMENT',
+    type: 'OFFICE',
     title: '',
     description: '',
     addressLine1: '',
@@ -76,6 +77,14 @@ export default function NewListingPage() {
   useEffect(() => {
     if (!isAuthenticated()) router.replace(loginHref(pathname));
   }, [router, pathname]);
+
+  // Recale le type sélectionné si celui par défaut n'est plus proposé.
+  useEffect(() => {
+    if (listingTypes.length > 0 && !listingTypes.includes(form.type)) {
+      setForm((f) => ({ ...f, type: listingTypes[0] }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listingTypes]);
 
   function onAddressSelect(r: GeoResult) {
     setGeo(r);
@@ -242,10 +251,10 @@ export default function NewListingPage() {
               <select
                 id="listing-type"
                 value={form.type}
-                onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as (typeof LISTING_TYPES)[number] }))}
+                onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
                 className="field"
               >
-                {LISTING_TYPES.map((t) => (
+                {listingTypes.map((t) => (
                   <option key={t} value={t}>
                     {typeLabel(t)}
                   </option>

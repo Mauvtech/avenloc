@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import AddressAutocomplete from '@/components/address-autocomplete';
 import DateRangeField from '@/components/date-range-field';
 import { geocodeCity, type GeoResult } from '@/lib/geo';
-import { LISTING_TYPES, typeLabel } from '@/lib/listing';
+import { typeLabel } from '@/lib/listing';
+import { useEnabledListingTypes } from '@/lib/use-enabled-listing-types';
 
 const CITY_FALLBACK: Record<string, { lat: number; lng: number }> = {
   paris: { lat: 48.8566, lng: 2.3522 },
@@ -21,6 +22,7 @@ const AMENITIES = ['wifi', 'parking', 'cuisine', 'climatisation'];
 export default function SearchForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const listingTypes = useEnabledListingTypes();
 
   const [locationText, setLocationText] = useState(params.get('place') ?? '');
   const [picked, setPicked] = useState<{ lat: number; lng: number } | null>(
@@ -166,7 +168,7 @@ export default function SearchForm() {
           <label className="label" htmlFor="search-type">Type d’espace</label>
           <select id="search-type" value={type} onChange={(e) => setType(e.target.value)} className="w-full bg-transparent text-sm outline-none">
             <option value=""> </option>
-            {LISTING_TYPES.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
+            {listingTypes.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
           </select>
         </div>
         <button type="submit" disabled={submitting} className="marketplace-search-submit">{submitting ? 'Recherche…' : 'Rechercher'}</button>

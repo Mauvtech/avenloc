@@ -326,6 +326,7 @@ export const api = {
 
 export interface FeatureFlags {
   simulatePayments: boolean;
+  enabledListingTypes: string[];
 }
 export interface FeaturesResponse {
   flags: FeatureFlags;

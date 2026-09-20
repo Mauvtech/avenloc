@@ -17,13 +17,32 @@ import { PrismaService } from '@/infrastructure/database/prisma.service';
  */
 export const FEATURE_KEYS = ['simulatePayments'] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
-export type FeatureFlags = Record<FeatureKey, boolean>;
+
+export interface FeatureFlags extends Record<FeatureKey, boolean> {
+  // Types d'annonces proposables à la création / recherche. Restreint pour
+  // l'instant à ceux du prototype (pas de logement, parking ou stockage —
+  // le prototype n'expose que des espaces professionnels à l'heure) ; un
+  // ADMIN peut réélargir la liste depuis /admin sans déploiement.
+  enabledListingTypes: string[];
+}
 
 // simulatePayments à true par défaut : le vrai Stripe n'est pas encore prêt
 // pour de vrais utilisateurs (onboarding Connect, cartes réelles...) — tant
 // qu'un admin ne l'active pas explicitement, tout le monde reste en simulation.
+const DEFAULT_ENABLED_LISTING_TYPES = [
+  'OFFICE',
+  'MEETING_ROOM',
+  'WORKSHOP',
+  'EVENT_SPACE',
+  'SHOP',
+  'PRACTICE_ROOM',
+  'RESTAURANT',
+  'CREATIVE_STUDIO',
+];
+
 const DEFAULTS: FeatureFlags = {
   simulatePayments: true,
+  enabledListingTypes: DEFAULT_ENABLED_LISTING_TYPES,
 };
 
 @Injectable()
@@ -47,7 +66,7 @@ export class FeaturesService implements OnModuleInit {
     const row = await this.prisma.featureFlagState.upsert({
       where: { id: 'default' },
       update: {},
-      create: { id: 'default', flags: bootDefaults as Prisma.InputJsonValue },
+      create: { id: 'default', flags: bootDefaults as unknown as Prisma.InputJsonValue },
     });
 
     this.flags = { ...DEFAULTS, ...(row.flags as Partial<FeatureFlags>) };
@@ -63,16 +82,20 @@ export class FeaturesService implements OnModuleInit {
   }
 
   /** Modifie les flags (PATCH /features, réservé à un compte ADMIN) et les persiste. */
-  async set(patch: Partial<FeatureFlags>): Promise<FeatureFlags> {
+  async set(patch: Partial<FeatureFlags> & { enabledListingTypes?: string[] }): Promise<FeatureFlags> {
     for (const key of FEATURE_KEYS) {
       if (typeof patch[key] === 'boolean') {
         this.flags[key] = patch[key] as boolean;
         this.logger.log(`Flag ${key} → ${this.flags[key]}`);
       }
     }
+    if (Array.isArray(patch.enabledListingTypes) && patch.enabledListingTypes.length > 0) {
+      this.flags.enabledListingTypes = patch.enabledListingTypes;
+      this.logger.log(`Flag enabledListingTypes → ${JSON.stringify(this.flags.enabledListingTypes)}`);
+    }
     await this.prisma.featureFlagState.update({
       where: { id: 'default' },
-      data: { flags: this.flags as Prisma.InputJsonValue },
+      data: { flags: this.flags as unknown as Prisma.InputJsonValue },
     });
     return this.all();
   }

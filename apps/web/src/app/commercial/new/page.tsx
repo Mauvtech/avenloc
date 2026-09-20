@@ -1,19 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import AddressAutocomplete from '@/components/address-autocomplete';
 import { BackLink } from '@/components/ui';
 import { useToast } from '@/components/toast';
 import { queueLead } from '@/lib/commercial-queue';
-import { LISTING_TYPES, PRICING_UNITS, UNIT_LABEL_SHORT, typeLabel } from '@/lib/listing';
+import { PRICING_UNITS, UNIT_LABEL_SHORT, typeLabel } from '@/lib/listing';
+import { useEnabledListingTypes } from '@/lib/use-enabled-listing-types';
 import type { GeoResult } from '@/lib/geo';
 import type { Establishment } from '@/lib/types';
 import { useCommercialGuard } from '../use-commercial-guard';
 
 export default function NewCommercialLeadPage() {
   const { ready } = useCommercialGuard();
+  const listingTypes = useEnabledListingTypes();
   const [step, setStep] = useState(0);
   const router = useRouter();
   const toast = useToast();
@@ -46,6 +48,14 @@ export default function NewCommercialLeadPage() {
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Recale le type sélectionné si celui par défaut n'est plus proposé.
+  useEffect(() => {
+    if (listingTypes.length > 0 && !listingTypes.includes(listing.type)) {
+      setListing((f) => ({ ...f, type: listingTypes[0] }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listingTypes]);
 
   async function lookupEstablishments() {
     if (!host.email.trim()) return;
@@ -263,10 +273,10 @@ export default function NewCommercialLeadPage() {
             <select
               id="commercial-listing-type"
               value={listing.type}
-              onChange={(e) => setListing((f) => ({ ...f, type: e.target.value as (typeof LISTING_TYPES)[number] }))}
+              onChange={(e) => setListing((f) => ({ ...f, type: e.target.value }))}
               className="field"
             >
-              {LISTING_TYPES.map((t) => (
+              {listingTypes.map((t) => (
                 <option key={t} value={t}>
                   {typeLabel(t)}
                 </option>
