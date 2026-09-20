@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import AddressAutocomplete from '@/components/address-autocomplete';
 import DateRangeField from '@/components/date-range-field';
+import TypeField from '@/components/type-field';
 import { geocodeCity, type GeoResult } from '@/lib/geo';
-import { typeLabel } from '@/lib/listing';
 import { useEnabledListingTypes } from '@/lib/use-enabled-listing-types';
 
 const CITY_FALLBACK: Record<string, { lat: number; lng: number }> = {
@@ -165,11 +165,8 @@ export default function SearchForm() {
           <DateRangeField startDate={startDate} endDate={endDate} onChange={({ startDate: s, endDate: e }) => { setStartDate(s); setEndDate(e); }} />
         </div>
         <div className="marketplace-search-field">
-          <label className="label" htmlFor="search-type">Type d’espace</label>
-          <select id="search-type" value={type} onChange={(e) => setType(e.target.value)} className="w-full bg-transparent text-sm outline-none">
-            <option value=""> </option>
-            {listingTypes.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
-          </select>
+          <span className="label">Type d’espace</span>
+          <TypeField value={type} onChange={setType} types={listingTypes} />
         </div>
         <button type="submit" disabled={submitting} className="marketplace-search-submit">{submitting ? 'Recherche…' : 'Rechercher'}</button>
       </div>
