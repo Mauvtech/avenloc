@@ -82,7 +82,7 @@ export default function ConversationsPage() {
       <PageHeader title="Messages" />
 
       {conversations.length === 0 ? (
-        <EmptyState icon="💬" title="Aucune conversation">
+        <EmptyState title="Aucune conversation">
           Une conversation s’ouvre automatiquement dès qu’une réservation est confirmée.
         </EmptyState>
       ) : (

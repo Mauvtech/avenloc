@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
 import { isAuthenticated, loginHref } from '@/lib/auth';
-import CategoryIcon from '@/components/category-icon';
 import AddressAutocomplete from '@/components/address-autocomplete';
 import ListingFaqEditor, { type FaqDraft } from '@/components/listing-faq-editor';
 import { BackLink, Stepper } from '@/components/ui';
@@ -230,7 +229,7 @@ export default function NewListingPage() {
       <BackLink href="/host/spaces">Retour à mes annonces</BackLink>
       <h1 className="text-2xl font-extrabold">Nouvelle annonce</h1>
 
-      <div className="overflow-x-auto pb-1">
+      <div className="no-scrollbar overflow-x-auto pb-1">
         <Stepper steps={STEPS} current={step} />
       </div>
 
@@ -239,27 +238,19 @@ export default function NewListingPage() {
         {step === 0 && (
           <section className="space-y-4">
             <div>
-              <span className="label">Type de local</span>
-              <div className="flex flex-wrap gap-2">
-                {LISTING_TYPES.map((t) => {
-                  const active = form.type === t;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setForm((f) => ({ ...f, type: t }))}
-                      className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-colors ${
-                        active
-                          ? 'border-ink bg-ink text-white'
-                          : 'border-line bg-surface text-ink hover:border-ink/40'
-                      }`}
-                    >
-                      <CategoryIcon type={t} size={16} />
-                      {typeLabel(t)}
-                    </button>
-                  );
-                })}
-              </div>
+              <label className="label" htmlFor="listing-type">Type de local</label>
+              <select
+                id="listing-type"
+                value={form.type}
+                onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as (typeof LISTING_TYPES)[number] }))}
+                className="field"
+              >
+                {LISTING_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {typeLabel(t)}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="label">Titre de l&apos;annonce</label>

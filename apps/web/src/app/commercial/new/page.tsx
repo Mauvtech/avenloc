@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import AddressAutocomplete from '@/components/address-autocomplete';
-import CategoryIcon from '@/components/category-icon';
 import { BackLink } from '@/components/ui';
 import { useToast } from '@/components/toast';
 import { queueLead } from '@/lib/commercial-queue';
@@ -260,22 +259,19 @@ export default function NewCommercialLeadPage() {
         <section className="space-y-4">
           <h2 className="section-title">Espace</h2>
           <div>
-            <span className="label">Type</span>
-            <div className="flex flex-wrap gap-2">
+            <label className="label" htmlFor="commercial-listing-type">Type</label>
+            <select
+              id="commercial-listing-type"
+              value={listing.type}
+              onChange={(e) => setListing((f) => ({ ...f, type: e.target.value as (typeof LISTING_TYPES)[number] }))}
+              className="field"
+            >
               {LISTING_TYPES.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setListing((f) => ({ ...f, type: t }))}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-colors ${
-                    listing.type === t ? 'border-ink bg-ink text-white' : 'border-line bg-surface text-ink hover:border-ink/40'
-                  }`}
-                >
-                  <CategoryIcon type={t} size={16} />
+                <option key={t} value={t}>
                   {typeLabel(t)}
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
           </div>
           <div>
             <label className="label">Nom de l&apos;espace</label>

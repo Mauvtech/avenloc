@@ -104,10 +104,12 @@ export const LISTING_STATUS_LABEL: Record<string, string> = {
   DRAFT: 'Brouillon',
   PUBLISHED: 'Publiée',
   ARCHIVED: 'Archivée',
+  PENDING_VALIDATION: 'À valider',
 };
 
 export const LISTING_STATUS_CLASS: Record<string, string> = {
   DRAFT: 'bg-canvas text-muted',
   PUBLISHED: 'bg-success-tint text-success-fg',
   ARCHIVED: 'bg-danger-tint text-danger-fg',
+  PENDING_VALIDATION: 'bg-warn-tint text-warn-fg',
 };

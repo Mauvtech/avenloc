@@ -1,25 +1,105 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import VerificationBadge from '@/components/verification-badge';
-import CategoryIcon from '@/components/category-icon';
 import { EmptyState, PageHeader, PageLoader } from '@/components/ui';
 import { useConfirm } from '@/components/confirm';
 import { useToast } from '@/components/toast';
 import { eurRound } from '@/lib/format';
 import { LISTING_STATUS_CLASS, LISTING_STATUS_LABEL, typeLabel, UNIT_LABEL_SHORT } from '@/lib/listing';
-import { fmtEUR, netAmount } from '@/lib/host-stats';
 import { useHostGuard } from '../use-host-guard';
-import type { Booking, Listing } from '@/lib/types';
+import type { Listing } from '@/lib/types';
 
 export default function HostSpacesPage() {
   return (
     <Suspense fallback={<PageLoader />}>
       <HostSpaces />
     </Suspense>
+  );
+}
+
+/** Menu « ⋯ » par ligne, façon SpaceRowMenu du prototype. */
+function SpaceRowMenu({
+  listing,
+  open,
+  onToggle,
+  busy,
+  onArchive,
+  onTogglePublish,
+}: {
+  listing: Listing;
+  open: boolean;
+  onToggle: () => void;
+  busy: boolean;
+  onArchive: () => void;
+  onTogglePublish: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onToggle();
+    }
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [open, onToggle]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="rounded-md border border-line px-2.5 py-1.5 text-sm leading-none text-ink hover:border-ink/30"
+      >
+        ⋯
+      </button>
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+6px)] z-10 w-56 overflow-hidden rounded-md border border-line bg-surface shadow-modal">
+          <Link
+            href={`/listings/${listing.id}`}
+            className="block px-3.5 py-2.5 text-[13px] text-ink hover:bg-canvas"
+          >
+            Voir l&apos;annonce
+          </Link>
+          <Link
+            href={`/listings/${listing.id}/edit`}
+            className="block px-3.5 py-2.5 text-[13px] text-ink hover:bg-canvas"
+          >
+            Gérer la fiche
+          </Link>
+          <Link
+            href={`/listings/${listing.id}/calendar`}
+            className="block px-3.5 py-2.5 text-[13px] text-ink hover:bg-canvas"
+          >
+            Modifier les disponibilités
+          </Link>
+          {listing.status !== 'ARCHIVED' && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onTogglePublish}
+              className="block w-full px-3.5 py-2.5 text-left text-[13px] text-ink hover:bg-canvas"
+            >
+              {listing.status === 'PUBLISHED' ? 'Dépublier' : 'Publier'}
+            </button>
+          )}
+          {listing.status !== 'ARCHIVED' && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onArchive}
+              className="block w-full border-t border-line px-3.5 py-2.5 text-left text-[13px] text-danger-fg hover:bg-danger-tint"
+            >
+              Désactiver l&apos;espace
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -32,18 +112,13 @@ function HostSpaces() {
   const createdId = searchParams.get('created');
 
   const [listings, setListings] = useState<Listing[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [ls, bs] = await Promise.all([
-      api.listings.mine().catch(() => [] as Listing[]),
-      api.bookings.asHost().catch(() => [] as Booking[]),
-    ]);
-    setListings(ls);
-    setBookings(bs);
+    setListings(await api.listings.mine().catch(() => [] as Listing[]));
   }, []);
 
   useEffect(() => {
@@ -53,11 +128,7 @@ function HostSpaces() {
 
   useEffect(() => {
     if (!createdId || listings.length === 0) return;
-    const el = document.getElementById(`listing-${createdId}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      toast.info('Annonce en brouillon — publiez-la pour la rendre visible');
-    }
+    toast.info('Annonce en brouillon — publiez-la pour la rendre visible');
     router.replace('/host/spaces');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createdId, listings.length]);
@@ -75,23 +146,12 @@ function HostSpaces() {
     }
   }
 
-  const revenueByListing = useMemo(() => {
-    const m = new Map<string, { count: number; net: number }>();
-    for (const b of bookings) {
-      if (b.status !== 'CONFIRMED' && b.status !== 'COMPLETED') continue;
-      const cur = m.get(b.listingId) ?? { count: 0, net: 0 };
-      cur.count++;
-      cur.net += netAmount(b);
-      m.set(b.listingId, cur);
-    }
-    return m;
-  }, [bookings]);
-
-  // Regroupe par établissement (fiches créées via le module Commercial) quand présent.
+  // Regroupe par adresse, comme HostSpaces du prototype (plusieurs espaces
+  // au même endroit — ex. fiches créées par un commercial pour un même lieu).
   const groups = useMemo(() => {
     const m = new Map<string, Listing[]>();
     for (const l of listings) {
-      const key = l.establishmentId ?? '__own__';
+      const key = `${l.addressLine1}, ${l.city}`;
       m.set(key, [...(m.get(key) ?? []), l]);
     }
     return m;
@@ -100,24 +160,20 @@ function HostSpaces() {
   if (!ready || loading) return <PageLoader />;
 
   return (
-    <div className="space-y-4">
+    <div>
       <PageHeader
-        title="Mes espaces"
+        title="Tous mes espaces"
         action={
           <Link href="/listings/new" className="btn-primary">
-            + Créer une annonce
+            + Nouvel espace
           </Link>
         }
       />
-      <p className="text-sm text-muted">
-        {listings.filter((l) => l.status === 'PUBLISHED').length} publiée(s) / {listings.length}
-      </p>
 
-      {error && <p className="text-sm text-danger-fg">{error}</p>}
+      {error && <p className="mt-3 text-sm text-danger-fg">{error}</p>}
 
       {listings.length === 0 ? (
         <EmptyState
-          icon="🏠"
           title="Aucune annonce"
           action={
             <Link href="/listings/new" className="btn-primary">
@@ -128,98 +184,82 @@ function HostSpaces() {
           Publiez votre premier espace pour commencer à recevoir des réservations.
         </EmptyState>
       ) : (
-        Array.from(groups.entries()).map(([key, group]) => (
-          <div key={key} className="space-y-2.5">
-            {key !== '__own__' && (
-              <h2 className="text-sm font-bold text-muted">
-                {group[0]?.establishmentId ? 'Établissement' : 'Mes annonces'}
-              </h2>
-            )}
-            {group.map((l) => {
-              const isBusy = busyId === l.id;
-              const rev = revenueByListing.get(l.id);
-              return (
-                <div
-                  key={l.id}
-                  id={`listing-${l.id}`}
-                  className={`card space-y-3 p-3.5 transition-shadow ${
-                    createdId === l.id ? 'ring-2 ring-brand' : ''
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <CategoryIcon type={l.type} size={20} className="mt-0.5 flex-none text-brand-fg" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-bold">{l.title}</span><VerificationBadge verifiedAt={l.verifiedAt} /></div>
-                      <div className="text-xs text-muted">
-                        {typeLabel(l.type)}
-                        {rev ? ` · ${rev.count} résa · ${fmtEUR(rev.net)}` : ' · aucune réservation'}
-                      </div>
+        Array.from(groups.entries()).map(([address, group]) => (
+          <div key={address} className="mt-6 first:mt-5">
+            <div className="mb-2.5 text-[13px] text-muted">{address}</div>
+            <div className="rounded-lg border border-line">
+              <div className="flex items-center gap-2 rounded-t-lg border-b border-line bg-canvas px-4 py-2.5 text-xs font-medium text-muted">
+                <div className="flex-[1.4]">Espace</div>
+                <div className="hidden flex-1 sm:block">Type</div>
+                <div className="hidden flex-1 sm:block">Capacité</div>
+                <div className="flex-1">Prix</div>
+                <div className="flex-1">Statut</div>
+                <div className="w-10" />
+              </div>
+              {group.map((l, i) => {
+                const isBusy = busyId === l.id;
+                return (
+                  <div
+                    key={l.id}
+                    id={`listing-${l.id}`}
+                    className={`flex items-center gap-2 px-4 py-3.5 ${
+                      i > 0 ? 'border-t border-line' : ''
+                    } ${i === group.length - 1 ? 'rounded-b-lg' : ''} ${createdId === l.id ? 'bg-brand-tint/40' : ''}`}
+                  >
+                    <div className="flex-[1.4] truncate text-sm font-medium">{l.title}</div>
+                    <div className="hidden flex-1 text-[13px] text-muted sm:block">
+                      {typeLabel(l.type)}
                     </div>
-                    <div className="flex-none text-right text-sm font-semibold">
-                      {eurRound(l.basePrice)}
-                      <span className="font-normal text-muted">
-                        /{UNIT_LABEL_SHORT[l.pricingUnit] ?? ''}
-                      </span>
+                    <div className="hidden flex-1 text-[13px] text-muted sm:block">
+                      {l.maxGuests != null ? `${l.maxGuests} pers.` : '—'}
                     </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                        LISTING_STATUS_CLASS[l.status] ?? 'bg-canvas text-muted'
-                      }`}
-                    >
-                      {LISTING_STATUS_LABEL[l.status] ?? l.status}
-                    </span>
-                    <span className="flex-1" />
-                    <Link href={`/listings/${l.id}`} className="btn-ghost px-3 py-2 text-[13px]">
-                      Voir
-                    </Link>
-                    <Link href={`/listings/${l.id}/edit`} className="btn-ghost px-3 py-2 text-[13px]">
-                      Modifier
-                    </Link>
-                    <Link href={`/listings/${l.id}/calendar`} className="btn-ghost px-3 py-2 text-[13px]">
-                      Calendrier
-                    </Link>
-                    {l.status === 'DRAFT' && (
-                      <button
-                        disabled={isBusy}
-                        onClick={() => run(l.id, () => api.listings.setStatus(l.id, 'PUBLISHED'))}
-                        className="btn-primary px-3 py-2 text-[13px]"
-                      >
-                        Publier
-                      </button>
-                    )}
-                    {l.status === 'PUBLISHED' && (
-                      <button
-                        disabled={isBusy}
-                        onClick={() => run(l.id, () => api.listings.setStatus(l.id, 'DRAFT'))}
-                        className="btn-ghost px-3 py-2 text-[13px]"
-                      >
-                        Dépublier
-                      </button>
-                    )}
-                    {l.status !== 'ARCHIVED' && (
-                      <button
-                        disabled={isBusy}
-                        onClick={async () => {
+                    <div className="flex-1 text-[13px]">
+                      {eurRound(l.basePrice)} / {UNIT_LABEL_SHORT[l.pricingUnit] ?? ''}
+                    </div>
+                    <div className="flex-1">
+                      {l.status === 'PENDING_VALIDATION' ? (
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${LISTING_STATUS_CLASS.PENDING_VALIDATION}`}
+                        >
+                          {LISTING_STATUS_LABEL.PENDING_VALIDATION}
+                        </span>
+                      ) : (
+                        <VerificationBadge verifiedAt={l.verifiedAt} showPending />
+                      )}
+                      {(l.status === 'DRAFT' || l.status === 'ARCHIVED') && (
+                        <span className="ml-1.5 text-xs text-muted">
+                          · {LISTING_STATUS_LABEL[l.status]}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex w-10 justify-end">
+                      <SpaceRowMenu
+                        listing={l}
+                        open={openId === l.id}
+                        onToggle={() => setOpenId(openId === l.id ? null : l.id)}
+                        busy={isBusy}
+                        onTogglePublish={() => {
+                          setOpenId(null);
+                          run(l.id, () =>
+                            api.listings.setStatus(l.id, l.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED'),
+                          );
+                        }}
+                        onArchive={async () => {
+                          setOpenId(null);
                           const ok = await confirm({
-                            title: 'Archiver cette annonce ?',
-                            body: 'Elle ne sera plus visible ni réservable. Les réservations en cours ne sont pas affectées.',
-                            confirmLabel: 'Archiver',
+                            title: 'Désactiver cet espace ?',
+                            body: 'Il ne sera plus visible ni réservable. Les réservations en cours ne sont pas affectées.',
+                            confirmLabel: 'Désactiver',
                             danger: true,
                           });
                           if (ok) run(l.id, () => api.listings.archive(l.id));
                         }}
-                        className="rounded px-3 py-2 text-[13px] font-semibold text-muted transition-colors hover:text-danger-fg"
-                      >
-                        Archiver
-                      </button>
-                    )}
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         ))
       )}

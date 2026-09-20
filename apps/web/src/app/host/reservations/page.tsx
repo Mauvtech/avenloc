@@ -1,23 +1,119 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { api } from '@/lib/api';
-import CategoryIcon from '@/components/category-icon';
-import { PageHeader, PageLoader } from '@/components/ui';
+import DepositCard from '@/components/deposit-card';
+import { PageLoader } from '@/components/ui';
 import { dateShort, timeLabel } from '@/lib/format';
-import { fmtEUR2, netAmount } from '@/lib/host-stats';
+import { fmtEUR2 } from '@/lib/host-stats';
 import { useHostGuard } from '../use-host-guard';
 import type { Booking } from '@/lib/types';
 
-const BK_STATUS: Record<string, { label: string; cls: string }> = {
+const STATUS_PILL: Record<string, { label: string; cls: string }> = {
   PENDING: { label: 'En attente', cls: 'bg-warn-tint text-warn-fg' },
-  CONFIRMED: { label: 'Confirmée', cls: 'bg-success-tint text-success-fg' },
+  CONFIRMED: { label: 'Confirmée', cls: 'bg-brand-tint text-brand-fg' },
   COMPLETED: { label: 'Terminée', cls: 'bg-canvas text-muted' },
   CANCELLED: { label: 'Annulée', cls: 'bg-danger-tint text-danger-fg' },
 };
 
-type BookingTab = 'pending' | 'upcoming' | 'past' | 'cancelled' | 'all';
+const PAYMENT_LABEL: Record<string, string> = {
+  CAPTURED: 'Payé',
+  AUTHORIZED: 'Autorisé',
+  PENDING: 'En attente',
+  REFUNDED: 'Remboursé',
+  FAILED: 'Échec',
+};
+
+/** Demande en attente de validation hôte, façon PendingRequestCard du prototype. */
+function PendingRequestCard({
+  booking,
+  busy,
+  onAccept,
+  onRefuse,
+}: {
+  booking: Booking;
+  busy: boolean;
+  onAccept: () => void;
+  onRefuse: () => void;
+}) {
+  return (
+    <div className="mb-2.5 rounded-md border border-line p-4">
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="text-sm font-semibold">
+            {booking.listing?.title ?? 'Annonce'}{' '}
+            <span className="font-normal text-muted">
+              · {booking.tenant ? `${booking.tenant.firstName} ${booking.tenant.lastName}` : 'Locataire'}
+            </span>
+          </div>
+          <div className="mt-0.5 text-[13px] text-muted">
+            {dateShort(booking.startAt)} · {timeLabel(booking.startAt)}–{timeLabel(booking.endAt)} ·{' '}
+            {fmtEUR2(booking.totalAmount)}
+          </div>
+        </div>
+        <span className="rounded-full bg-warn-tint px-2.5 py-1 text-xs font-semibold text-warn-fg">
+          En attente de validation
+        </span>
+      </div>
+
+      {booking.activityDescription && (
+        <div className="mt-2.5 rounded-md bg-canvas p-2.5 text-[13px]">{booking.activityDescription}</div>
+      )}
+
+      <div className="mt-3 flex gap-2.5">
+        <button disabled={busy} onClick={onAccept} className="btn-primary btn-sm">
+          Accepter
+        </button>
+        <button disabled={busy} onClick={onRefuse} className="btn-ghost btn-sm">
+          Refuser
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Réservation passée + réclamation de caution éventuelle, façon HostPastBookingCard. */
+function PastBookingCard({
+  booking,
+  busy,
+  onComplete,
+}: {
+  booking: Booking;
+  busy: boolean;
+  onComplete: () => void;
+}) {
+  const notYetCompleted = booking.status === 'CONFIRMED';
+  return (
+    <div className="mb-2.5 rounded-md border border-line p-4">
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="text-sm font-semibold">{booking.listing?.title ?? 'Annonce'}</div>
+          <div className="mt-0.5 text-[13px] text-muted">
+            {dateShort(booking.startAt)} · {timeLabel(booking.startAt)}–{timeLabel(booking.endAt)}
+          </div>
+        </div>
+        <div className="text-right">
+          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_PILL[booking.status]?.cls ?? 'bg-canvas text-muted'}`}>
+            {STATUS_PILL[booking.status]?.label ?? booking.status}
+          </span>
+          <div className="mt-2 text-sm font-semibold">{fmtEUR2(booking.totalAmount)}</div>
+        </div>
+      </div>
+      {notYetCompleted && (
+        <button disabled={busy} onClick={onComplete} className="btn-ghost btn-sm mt-3">
+          Marquer terminée
+        </button>
+      )}
+      {booking.status !== 'CANCELLED' && (
+        <div className="mt-3">
+          <DepositCard bookingId={booking.id} role="host" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+type Tab = 'upcoming' | 'ongoing' | 'past';
 
 export default function HostReservationsPage() {
   const { ready } = useHostGuard();
@@ -25,7 +121,7 @@ export default function HostReservationsPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<BookingTab>('pending');
+  const [tab, setTab] = useState<Tab>('upcoming');
 
   const load = () =>
     api.bookings
@@ -53,131 +149,115 @@ export default function HostReservationsPage() {
   }
 
   const nowTs = Date.now();
+  const pending = useMemo(() => bookings.filter((b) => b.status === 'PENDING'), [bookings]);
 
   const filtered = useMemo(() => {
-    const byTab = (b: Booking) => {
-      const endTs = new Date(b.endAt).getTime();
-      switch (tab) {
-        case 'pending':
-          return b.status === 'PENDING';
-        case 'upcoming':
-          return b.status === 'CONFIRMED' && endTs >= nowTs;
-        case 'past':
-          return b.status === 'COMPLETED' || (b.status === 'CONFIRMED' && endTs < nowTs);
-        case 'cancelled':
-          return b.status === 'CANCELLED';
-        default:
-          return true;
-      }
-    };
     return bookings
-      .filter(byTab)
+      .filter((b) => {
+        const startTs = new Date(b.startAt).getTime();
+        const endTs = new Date(b.endAt).getTime();
+        if (tab === 'upcoming') return b.status === 'CONFIRMED' && startTs > nowTs;
+        if (tab === 'ongoing') return b.status === 'CONFIRMED' && startTs <= nowTs && endTs >= nowTs;
+        return b.status === 'COMPLETED' || b.status === 'CANCELLED' || (b.status === 'CONFIRMED' && endTs < nowTs);
+      })
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   }, [bookings, tab, nowTs]);
-
-  const tabCounts = useMemo(
-    () => ({
-      pending: bookings.filter((b) => b.status === 'PENDING').length,
-      upcoming: bookings.filter((b) => b.status === 'CONFIRMED' && new Date(b.endAt).getTime() >= nowTs)
-        .length,
-      past: bookings.filter(
-        (b) => b.status === 'COMPLETED' || (b.status === 'CONFIRMED' && new Date(b.endAt).getTime() < nowTs),
-      ).length,
-      cancelled: bookings.filter((b) => b.status === 'CANCELLED').length,
-      all: bookings.length,
-    }),
-    [bookings, nowTs],
-  );
 
   if (!ready || loading) return <PageLoader />;
 
   return (
-    <div className="space-y-3">
-      <PageHeader title="Réservations" />
-      <div className="flex flex-wrap gap-1.5">
+    <div>
+      <h1 className="mb-5 text-xl font-bold">Réservations</h1>
+
+      {pending.length > 0 && (
+        <div className="mb-8">
+          <div className="section-title mb-3">Demandes en attente ({pending.length})</div>
+          {pending.map((b) => (
+            <PendingRequestCard
+              key={b.id}
+              booking={b}
+              busy={busyId === b.id}
+              onAccept={() => run(b.id, () => api.bookings.approve(b.id))}
+              onRefuse={() => run(b.id, () => api.bookings.reject(b.id))}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="auth-tabs mb-4">
         {(
           [
-            ['pending', 'En attente'],
-            ['upcoming', 'À venir'],
-            ['past', 'Passées'],
-            ['cancelled', 'Annulées'],
-            ['all', 'Toutes'],
-          ] as [BookingTab, string][]
+            ['upcoming', 'à venir'],
+            ['ongoing', 'en cours'],
+            ['past', 'passée'],
+          ] as [Tab, string][]
         ).map(([key, label]) => (
-          <button key={key} onClick={() => setTab(key)} className={`chip ${tab === key ? 'chip-active' : ''}`}>
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`auth-tab capitalize ${tab === key ? 'auth-tab-active' : ''}`}
+          >
             {label}
-            <span className={tab === key ? 'text-white/80' : 'text-muted'}> · {tabCounts[key]}</span>
           </button>
         ))}
       </div>
 
-      {error && <p className="text-sm text-danger-fg">{error}</p>}
+      {error && <p className="mb-3 text-sm text-danger-fg">{error}</p>}
 
-      {filtered.length === 0 ? (
-        <div className="card p-8 text-center text-sm text-muted">Aucune réservation dans cette catégorie.</div>
+      {tab === 'past' ? (
+        <div>
+          {filtered.length === 0 && <p className="text-[13px] text-muted">Aucune réservation passée.</p>}
+          {filtered.map((b) => (
+            <PastBookingCard
+              key={b.id}
+              booking={b}
+              busy={busyId === b.id}
+              onComplete={() => run(b.id, () => api.bookings.complete(b.id))}
+            />
+          ))}
+        </div>
       ) : (
-        <div className="space-y-2.5">
-          {filtered.map((b) => {
-            const isBusy = busyId === b.id;
-            const endPassed = new Date(b.endAt).getTime() < nowTs;
-            return (
-              <div key={b.id} className="card space-y-3 p-3.5">
-                <div className="flex items-start gap-3">
-                  <CategoryIcon type={b.listing?.type ?? 'OTHER'} size={20} className="mt-0.5 flex-none text-brand-fg" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-bold">{b.listing?.title ?? 'Annonce'}</div>
-                    <div className="text-xs text-muted">
-                      {b.tenant ? `${b.tenant.firstName} ${b.tenant.lastName}` : 'Locataire'} ·{' '}
-                      {dateShort(b.startAt)} · {timeLabel(b.startAt)}–{timeLabel(b.endAt)} · {b.guestCount} pers.
-                      {b.arrivalTime ? ` · arrivée ${b.arrivalTime}` : ''}
-                    </div>
-                    {b.guestNote && <div className="mt-0.5 text-xs italic text-muted">« {b.guestNote} »</div>}
-                    {b.activityDescription && (
-                      <div className="mt-0.5 text-xs text-muted">Activité : {b.activityDescription}</div>
-                    )}
-                  </div>
-                  <div className="flex-none text-right">
-                    <div className="text-sm font-extrabold">{fmtEUR2(netAmount(b))}</div>
-                    <div className="text-[10px] text-muted">net</div>
-                  </div>
+        <div className="overflow-hidden rounded-lg border border-line">
+          <div className="hidden px-4 py-2.5 text-xs font-medium text-muted sm:flex" style={{ background: '#FAFAF9' }}>
+            <div className="flex-[1.4]">Espace</div>
+            <div className="flex-1">Date</div>
+            <div className="flex-1">Créneau</div>
+            <div className="flex-1">Montant</div>
+            <div className="flex-1">Paiement</div>
+            <div className="flex-1">Statut</div>
+          </div>
+          {filtered.length === 0 && (
+            <div className="px-4 py-4 text-[13px] text-muted">Aucune réservation {tab === 'upcoming' ? 'à venir' : 'en cours'}.</div>
+          )}
+          {filtered.map((b, i) => (
+            <div
+              key={b.id}
+              className={`flex flex-col gap-1.5 px-4 py-3.5 text-[13px] sm:flex-row sm:items-center sm:gap-0 ${i > 0 ? 'border-t border-line' : ''}`}
+            >
+              <div className="flex items-start justify-between gap-2 sm:contents">
+                <div className="font-medium sm:flex-[1.4]">{b.listing?.title ?? 'Annonce'}</div>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold sm:order-last sm:flex-1 ${STATUS_PILL[b.status]?.cls ?? 'bg-canvas text-muted'}`}>
+                  {STATUS_PILL[b.status]?.label ?? b.status}
+                </span>
+                <div className="hidden text-muted sm:block sm:flex-1">{dateShort(b.startAt)}</div>
+                <div className="hidden text-muted sm:block sm:flex-1">
+                  {timeLabel(b.startAt)}–{timeLabel(b.endAt)}
                 </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${BK_STATUS[b.status]?.cls ?? 'bg-canvas text-muted'}`}>
-                    {BK_STATUS[b.status]?.label ?? b.status}
-                  </span>
-                  <span className="flex-1" />
-                  {b.status === 'PENDING' && (
-                    <>
-                      <button disabled={isBusy} onClick={() => run(b.id, () => api.bookings.reject(b.id))} className="btn-ghost px-3 py-2 text-[13px]">
-                        Refuser
-                      </button>
-                      <button disabled={isBusy} onClick={() => run(b.id, () => api.bookings.approve(b.id))} className="btn-primary px-3 py-2 text-[13px]">
-                        Accepter
-                      </button>
-                    </>
-                  )}
-                  {b.status === 'CONFIRMED' && (
-                    <>
-                      <Link href="/host/messages" className="btn-ghost px-3 py-2 text-[13px]">
-                        Message
-                      </Link>
-                      {endPassed && (
-                        <button disabled={isBusy} onClick={() => run(b.id, () => api.bookings.complete(b.id))} className="btn-primary px-3 py-2 text-[13px]">
-                          Marquer terminée
-                        </button>
-                      )}
-                    </>
-                  )}
-                  {b.status === 'COMPLETED' && (
-                    <Link href="/host/messages" className="btn-ghost px-3 py-2 text-[13px]">
-                      Message
-                    </Link>
-                  )}
+                <div className="hidden sm:block sm:flex-1">{fmtEUR2(b.totalAmount)}</div>
+                <div className="hidden text-muted sm:block sm:flex-1">
+                  {(b.payment && PAYMENT_LABEL[b.payment.status]) ?? '—'}
                 </div>
               </div>
-            );
-          })}
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted sm:hidden">
+                <span>{dateShort(b.startAt)}</span>
+                <span>
+                  {timeLabel(b.startAt)}–{timeLabel(b.endAt)}
+                </span>
+                <span className="font-medium text-ink">{fmtEUR2(b.totalAmount)}</span>
+                {b.payment && <span>{PAYMENT_LABEL[b.payment.status]}</span>}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

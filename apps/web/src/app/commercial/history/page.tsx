@@ -81,7 +81,7 @@ export default function CommercialHistoryPage() {
       />
 
       {invitations.length === 0 ? (
-        <EmptyState icon="🗂️" title="Aucune fiche pour l'instant" />
+        <EmptyState title="Aucune fiche pour l'instant" />
       ) : (
         <div className="space-y-2.5">
           {invitations.map((inv) => (

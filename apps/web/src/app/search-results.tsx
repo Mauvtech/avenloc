@@ -49,7 +49,7 @@ export default async function SearchResults({ searchParams }: Props) {
 
   if (result.listings.length === 0) {
     return (
-      <EmptyState icon="🔍" title={isSearch ? 'Aucun résultat' : 'Aucune annonce publiée'}>
+      <EmptyState title={isSearch ? 'Aucun résultat' : 'Aucune annonce publiée'}>
         {isSearch
           ? 'Élargissez la zone ou assouplissez vos filtres.'
           : 'Revenez bientôt — les premières annonces arrivent.'}

@@ -206,6 +206,7 @@ export class BookingsService {
       include: {
         listing: { select: { title: true, city: true, type: true } },
         tenant: { select: { firstName: true, lastName: true, avatarUrl: true } },
+        payment: true,
       },
       orderBy: { createdAt: 'desc' },
     });

@@ -187,7 +187,7 @@ export interface Review {
   listingId: string | null;
   tenantSubjectId: string | null;
   listingTitle?: string;
-  author?: { firstName: string; lastName: string };
+  authorFirstName?: string;
   createdAt: string;
 }
 
