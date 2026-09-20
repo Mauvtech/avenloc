@@ -108,6 +108,23 @@ const LAST_NAMES = [
   'Bertrand', 'Roux', 'Vincent', 'Fournier', 'Morel', 'André', 'Mercier', 'Blanchard',
 ];
 
+// La quasi-totalité des SpaceCard du prototype affichent une note — sans ça,
+// le catalogue de remplissage a l'air vide de tout historique. On génère donc
+// 1 à 5 avis (skewed positif) sur ~82% des annonces de remplissage publiées.
+const REVIEW_COMMENTS = [
+  'Espace conforme à la description, accès facile.',
+  'Très bon rapport qualité-prix, je recommande.',
+  "Hôte réactif, tout s'est bien passé.",
+  'Propre et bien situé, parfait pour mes besoins.',
+  'Quelques détails à revoir mais globalement satisfait.',
+  "Exactement ce qu'il me fallait pour mon événement.",
+  'Accueil chaleureux, équipement au top.',
+  "Un peu bruyant mais l'espace reste agréable.",
+  'Rien à redire, je reviendrai.',
+  'Bon emplacement, facile d’accès en transport.',
+];
+const RATING_WEIGHTS = [3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 2];
+
 interface TypeTemplate {
   type: ListingType;
   titles: string[];
@@ -156,6 +173,24 @@ async function generateFillerListings(count: number, hashedPassword: string): Pr
     fillerHosts.push(u);
   }
 
+  const FILLER_REVIEWER_COUNT = 8;
+  const fillerReviewers: { id: string }[] = [];
+  for (let i = 0; i < FILLER_REVIEWER_COUNT; i++) {
+    const email = `filler-reviewer-${String(i + 1).padStart(2, '0')}@aven.dev`;
+    const u = await prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: {
+        email,
+        hashedPassword,
+        firstName: FIRST_NAMES[(i + 7) % FIRST_NAMES.length],
+        lastName: LAST_NAMES[(i * 5 + 2) % LAST_NAMES.length],
+        roles: ['TENANT'],
+      },
+    });
+    fillerReviewers.push(u);
+  }
+
   let created = 0;
   for (let i = 0; i < count; i++) {
     const tpl = pick(TYPE_TEMPLATES);
@@ -191,6 +226,52 @@ async function generateFillerListings(count: number, hashedPassword: string): Pr
       },
     });
     await ensurePhotos(listing.id, tpl.photoCategory, i);
+
+    if (status === 'PUBLISHED' && rng() < 0.82) {
+      const reviewCount = randInt(1, 5);
+      for (let r = 0; r < reviewCount; r++) {
+        const reviewer = fillerReviewers[(i * 7 + r * 3) % fillerReviewers.length];
+        const startAt = atDay(-(20 + r * 9 + (i % 15)), 9 + r * 2);
+        const durationHours = tpl.pricingUnit === PricingUnit.HOUR ? randInt(1, 3) : 24;
+        const endAt = addHours(startAt, durationHours);
+        const unitCount = tpl.pricingUnit === PricingUnit.HOUR ? durationHours : 1;
+        const amounts = pricing(price, unitCount);
+        const booking = await prisma.booking.create({
+          data: {
+            listingId: listing.id,
+            tenantId: reviewer.id,
+            status: 'COMPLETED',
+            startAt,
+            endAt,
+            unitCount,
+            guestCount: 1,
+            houseRulesAccepted: true,
+            ...amounts,
+          },
+        });
+        await prisma.payment.create({
+          data: {
+            bookingId: booking.id,
+            status: 'CAPTURED',
+            amount: amounts.totalAmount,
+            platformFee: amounts.serviceFee,
+            hostPayout: round2(amounts.totalAmount - amounts.serviceFee),
+            capturedAt: endAt,
+          },
+        });
+        await prisma.review.create({
+          data: {
+            bookingId: booking.id,
+            authorId: reviewer.id,
+            target: 'LISTING',
+            rating: pick(RATING_WEIGHTS),
+            comment: pick(REVIEW_COMMENTS),
+            listingId: listing.id,
+          },
+        });
+      }
+    }
+
     created++;
   }
 

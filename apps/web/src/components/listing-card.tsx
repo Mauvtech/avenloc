@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import VerificationBadge from '@/components/verification-badge';
-import CategoryIcon from '@/components/category-icon';
 import WishlistButton from '@/components/wishlist-button';
 import { eurRound } from '@/lib/format';
 import { typeLabel, UNIT_LABEL_SHORT } from '@/lib/listing';
@@ -18,11 +17,7 @@ export default function ListingCard({ listing }: { listing: SearchResultItem }) 
             alt={listing.title}
             className="h-full w-full object-cover"
           />
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <CategoryIcon type={listing.type} size={34} className="text-line" />
-          </div>
-        )}
+        ) : null}
         <WishlistButton listingId={listing.id} className="absolute right-2.5 top-2.5" />
       </div>
 

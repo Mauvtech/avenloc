@@ -123,7 +123,7 @@ export default function ModerationPage() {
       </p>
 
       {filtered.length === 0 ? (
-        <EmptyState icon="🔍" title="Aucune annonce trouvée" />
+        <EmptyState title="Aucune annonce trouvée" />
       ) : (
         <div className="space-y-2.5">
           {filtered.map((l) => {

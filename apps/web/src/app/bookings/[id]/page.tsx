@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
 import { isAuthenticated, loginHref } from '@/lib/auth';
-import CategoryIcon from '@/components/category-icon';
 import StripePayment from '@/components/stripe-payment';
 import DepositCard from '@/components/deposit-card';
 import AccessMethodBlock from '@/components/access-method-block';
@@ -156,13 +155,9 @@ export default function BookingDetailPage() {
         className="card card-hover flex items-center gap-3 overflow-hidden p-3"
       >
         <div className="h-16 w-20 flex-none overflow-hidden rounded-md bg-canvas">
-          {cover ? (
+          {cover && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={cover} alt={title} className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <CategoryIcon type={type} size={22} className="text-line" />
-            </div>
           )}
         </div>
         <div className="min-w-0 flex-1">

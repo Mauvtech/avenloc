@@ -58,7 +58,6 @@ export default function WishlistPage() {
         </div>
       ) : items.length === 0 ? (
         <EmptyState
-          icon="♥"
           title="Aucun favori"
           action={
             <Link href="/" className="btn-primary">

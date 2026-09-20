@@ -24,6 +24,12 @@ interface LinkDef {
   badge?: number;
 }
 
+const ROLE_SWITCHER = [
+  { href: '/bookings', label: 'Espace client', shortLabel: 'Client' },
+  { href: '/host', label: 'Espace hôte', shortLabel: 'Hôte' },
+  { href: '/commercial', label: 'Commercial', shortLabel: 'Commercial' },
+];
+
 export default function Nav() {
   const router = useRouter();
   const pathname = usePathname();
@@ -147,8 +153,8 @@ export default function Nav() {
       <div className="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-2.5 px-5 py-4">
         <Logo />
 
-        <nav aria-label="Espaces" className="role-switcher ml-auto flex gap-1 rounded bg-canvas p-[3px]">
-          {[{ href: '/bookings', label: 'Espace client' }, { href: '/host', label: 'Espace hôte' }, { href: '/commercial', label: 'Commercial' }].map(({ href, label }) => (
+        <nav aria-label="Espaces" className="role-switcher ml-auto hidden gap-1 rounded bg-canvas p-[3px] md:flex">
+          {ROLE_SWITCHER.map(({ href, label }) => (
             <Link key={href} href={mounted && user ? href : loginHref(href)}
               className={`rounded-[6px] px-3.5 py-[7px] text-[13px] font-medium ${isActive(href) ? 'bg-white text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)]' : 'text-muted hover:text-ink'}`}>
               {label}
@@ -208,10 +214,10 @@ export default function Nav() {
           }
         </div>
 
-        {/* ── Mobile ──────────────────────────────────────────────── */}
-        {mounted && user && <button
+        {/* ── Mobile : un seul point d'entrée pour toute la navigation ── */}
+        <button
           onClick={() => setDrawerOpen(true)}
-          className="relative flex h-9 w-9 items-center justify-center rounded-md text-ink hover:bg-canvas md:hidden"
+          className="relative ml-auto flex h-9 w-9 items-center justify-center rounded-md text-ink hover:bg-canvas md:hidden"
           aria-label="Ouvrir le menu"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -222,7 +228,7 @@ export default function Nav() {
           {mounted && unread > 0 && (
             <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-brand" />
           )}
-        </button>}
+        </button>
       </div>
 
       {/* ── Panneau mobile ────────────────────────────────────────── */}
@@ -247,6 +253,20 @@ export default function Nav() {
                   <line x1="18" y1="6" x2="6" y2="18" />
                 </svg>
               </button>
+            </div>
+
+            <div className="mx-4 mb-4 mt-3 flex gap-1 rounded-lg bg-canvas p-[3px]">
+              {ROLE_SWITCHER.map(({ href, shortLabel }) => (
+                <Link
+                  key={href}
+                  href={mounted && user ? href : loginHref(href)}
+                  className={`flex-1 whitespace-nowrap rounded-md px-2 py-[7px] text-center text-[13px] font-medium ${
+                    isActive(href) ? 'bg-white text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)]' : 'text-muted'
+                  }`}
+                >
+                  {shortLabel}
+                </Link>
+              ))}
             </div>
 
             {!mounted ? null : user ? (

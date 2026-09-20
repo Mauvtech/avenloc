@@ -2,66 +2,55 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter, usePathname } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isAuthenticated, loginHref, registerHref } from '@/lib/auth';
+import { isAuthenticated } from '@/lib/auth';
 import VerificationBadge from '@/components/verification-badge';
-import CategoryIcon from '@/components/category-icon';
-import SlotPicker, { type SlotSelection } from '@/components/slot-picker';
-import PriceBreakdown from '@/components/price-breakdown';
 import Avatar from '@/components/avatar';
 import ListingCard from '@/components/listing-card';
 import { BackLink, Skeleton, StarRating } from '@/components/ui';
 import { useToast } from '@/components/toast';
-import { eur, eurRound } from '@/lib/format';
+import { eurRound } from '@/lib/format';
 import {
   ACCESS_METHOD_LABEL,
   capacityNoun,
   LISTING_STATUS_CLASS,
   LISTING_STATUS_LABEL,
-  typeLabel,
   UNIT_LABEL_SHORT,
   WEEKDAY_LABEL,
 } from '@/lib/listing';
 import { cancellationPolicyDetail } from '@/lib/cancellation-policies';
-import type { Listing, Quote, ReviewList, SearchResultItem, User } from '@/lib/types';
+import type { Listing, ReviewList, SearchResultItem, User } from '@/lib/types';
 
 const attrValue = (v: unknown) =>
   typeof v === 'boolean' ? (v ? 'Oui' : 'Non') : v == null ? '—' : String(v);
 const humanize = (k: string) => k.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 
+/** Ligne label/valeur des « Informations pratiques », façon InfoRow du prototype. */
+function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
+  if (!value) return null;
+  return (
+    <div className="flex border-b border-line py-2.5 text-sm">
+      <div className="w-[130px] shrink-0 text-muted">{label}</div>
+      <div>{value}</div>
+    </div>
+  );
+}
+
 export default function ListingPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const pathname = usePathname();
   const toast = useToast();
 
   const [listing, setListing] = useState<Listing | null>(null);
   const [reviews, setReviews] = useState<ReviewList | null>(null);
   const [me, setMe] = useState<User | null>(null);
-  const [loggedIn, setLoggedIn] = useState(false);
   const [similar, setSimilar] = useState<SearchResultItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [lightbox, setLightbox] = useState<string | null>(null);
-
-  const [slot, setSlot] = useState<SlotSelection | null>(null);
-  const [quote, setQuote] = useState<Quote | null>(null);
-  const [quoting, setQuoting] = useState(false);
-  const [bookingForm, setBookingForm] = useState({
-    guestCount: '1',
-    arrivalTime: '',
-    guestNote: '',
-    activityDescription: '',
-    rcProAccepted: false,
-    houseRulesAccepted: false,
-  });
-  const [showHouseRules, setShowHouseRules] = useState(false);
-  const [bookingError, setBookingError] = useState<string | null>(null);
-  const [bookingLoading, setBookingLoading] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
 
   useEffect(() => {
-    setLoggedIn(isAuthenticated());
     Promise.all([
       api.listings.getById(id),
       api.reviews.byListing(id),
@@ -75,23 +64,6 @@ export default function ListingPage() {
           .search(`type=${l.type}&limit=7`)
           .then((res) => setSimilar(res.listings.filter((x) => x.id !== l.id).slice(0, 3)))
           .catch(() => setSimilar([]));
-
-        // Restaure la sélection en cours si l'utilisateur revient d'une
-        // connexion/inscription déclenchée depuis cette même annonce.
-        try {
-          const raw = sessionStorage.getItem(`aven:draft:${id}`);
-          if (raw) {
-            const draft = JSON.parse(raw) as {
-              slot?: typeof slot;
-              bookingForm?: typeof bookingForm;
-            };
-            if (draft.slot) setSlot(draft.slot);
-            if (draft.bookingForm) setBookingForm(draft.bookingForm);
-            sessionStorage.removeItem(`aven:draft:${id}`);
-          }
-        } catch {
-          /* ignore */
-        }
       })
       .catch(() => router.replace('/'))
       .finally(() => setLoading(false));
@@ -104,76 +76,6 @@ export default function ListingPage() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [lightbox]);
-
-  // Devis live dès qu'un créneau est choisi.
-  useEffect(() => {
-    if (!slot) {
-      setQuote(null);
-      return;
-    }
-    let cancelled = false;
-    setQuoting(true);
-    api.bookings
-      .quote({ listingId: id, date: slot.date, startTime: slot.startTime, endTime: slot.endTime })
-      .then((q) => !cancelled && setQuote(q))
-      .catch(() => !cancelled && setQuote(null))
-      .finally(() => !cancelled && setQuoting(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [slot, id]);
-
-  async function handleBook(e: React.FormEvent) {
-    e.preventDefault();
-    if (!isAuthenticated()) return router.push(loginHref(pathname));
-    if (!slot) {
-      setBookingError('Choisissez un créneau.');
-      return;
-    }
-    if (!bookingForm.houseRulesAccepted) {
-      setBookingError("Merci d'accepter le règlement intérieur de l'annonce.");
-      return;
-    }
-    setBookingError(null);
-    setBookingLoading(true);
-    try {
-      const booking = await api.bookings.create({
-        listingId: id,
-        date: slot.date,
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-        guestCount: parseInt(bookingForm.guestCount, 10),
-        arrivalTime: bookingForm.arrivalTime || undefined,
-        guestNote: bookingForm.guestNote || undefined,
-        activityDescription: bookingForm.activityDescription || undefined,
-        rcProAccepted: bookingForm.rcProAccepted,
-        houseRulesAccepted: bookingForm.houseRulesAccepted,
-      });
-      router.push(`/bookings/${booking.id}`);
-    } catch (err) {
-      setBookingError(err instanceof Error ? err.message : 'Erreur lors de la réservation');
-    } finally {
-      setBookingLoading(false);
-    }
-  }
-
-  function saveDraft() {
-    try {
-      sessionStorage.setItem(`aven:draft:${id}`, JSON.stringify({ slot, bookingForm }));
-    } catch {
-      /* ignore */
-    }
-  }
-
-  async function handleContact() {
-    if (!isAuthenticated()) return router.push(loginHref(pathname));
-    try {
-      await api.conversations.create({ listingId: id });
-      router.push('/conversations');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Impossible d’ouvrir la conversation');
-    }
-  }
 
   async function toggleStatus() {
     if (!listing) return;
@@ -240,8 +142,7 @@ export default function ListingPage() {
         <div className="space-y-7">
       {/* Galerie */}
       {photos.length === 0 && (
-        <div className="flex h-40 items-center justify-center gap-3 rounded-lg border border-dashed border-line bg-canvas text-sm text-muted sm:h-56">
-          <CategoryIcon type={listing.type} size={30} className="text-line" />
+        <div className="flex h-40 items-center justify-center rounded-lg bg-canvas text-sm text-muted sm:h-56">
           Aucune photo pour cette annonce
         </div>
       )}
@@ -257,35 +158,20 @@ export default function ListingPage() {
       )}
       {/* En-tête */}
       <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="badge">
-            <CategoryIcon type={listing.type} size={13} />
-            {typeLabel(listing.type)}
-          </span>
-          {listing.instantBookEnabled ? (
-            <span className="rounded-full bg-success-tint px-2.5 py-0.5 text-[11px] font-bold text-success-fg">
-              ⚡ Réservation instantanée
-            </span>
-          ) : (
-            <span className="rounded-full border border-line px-2.5 py-0.5 text-[11px] font-bold text-muted">
-              Sur validation de l&apos;hôte
-            </span>
-          )}
-        </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold leading-tight">{listing.title}</h1>
           <VerificationBadge verifiedAt={listing.verifiedAt} />
         </div>
-        <p className="text-sm text-muted">
+        <div className="flex flex-wrap items-center gap-5 text-sm text-muted">
+          {listing.maxGuests != null && <span>{listing.maxGuests} {capacityNoun(listing.type)}</span>}
           {rating !== null && (
-            <span className="font-semibold text-ink">
+            <span>
               ★ {rating.toFixed(1)}
-              {reviews && reviews.total > 0 && ` · ${reviews.total} avis`}
+              {reviews && reviews.total > 0 && ` (${reviews.total} avis)`}
             </span>
           )}
-          {rating !== null && ' · '}
-          {listing.city}
-        </p>
+          <span>{listing.city}</span>
+        </div>
       </div>
 
           {/* Hôte */}
@@ -370,49 +256,54 @@ export default function ListingPage() {
             </div>
           </section>
 
-          <section className="space-y-3">
-            <h2 className="section-title mb-2">Conditions</h2>
-            <div className="rounded-md border border-line p-3.5 text-sm">
-              <p className="font-semibold text-ink">
-                Annulation {cancellationPolicyDetail(listing.cancellationPolicy).label}
-              </p>
-              <p className="mt-1 text-muted">{cancellationPolicyDetail(listing.cancellationPolicy).refund}</p>
-              <dl className="mt-3 space-y-1.5 text-xs text-muted">
-                <div className="flex gap-2">
-                  <dt className="w-24 shrink-0 font-semibold text-ink">No-show</dt>
-                  <dd>{cancellationPolicyDetail(listing.cancellationPolicy).noShow}</dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="w-24 shrink-0 font-semibold text-ink">Retard</dt>
-                  <dd>{cancellationPolicyDetail(listing.cancellationPolicy).lateArrival}</dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="w-24 shrink-0 font-semibold text-ink">Dépassement</dt>
-                  <dd>{cancellationPolicyDetail(listing.cancellationPolicy).overrun}</dd>
-                </div>
-              </dl>
+          <section>
+            <h2 className="section-title mb-1.5">Informations pratiques</h2>
+            <div>
+              <InfoRow
+                label="Horaires"
+                value={`${listing.openDays.map((d) => WEEKDAY_LABEL[d]).join(', ')}, ${listing.openStartTime}–${listing.openEndTime}`}
+              />
+              <InfoRow
+                label="Méthode d'accès"
+                value={listing.accessMethod ? ACCESS_METHOD_LABEL[listing.accessMethod] ?? listing.accessMethod : null}
+              />
+              <InfoRow
+                label="Politique d'annulation"
+                value={cancellationPolicyDetail(listing.cancellationPolicy).label}
+              />
+              <InfoRow
+                label="Caution"
+                value={
+                  listing.depositAmount
+                    ? `${eurRound(listing.depositAmount)} (empreinte bancaire, restituée après usage)`
+                    : 'Aucune'
+                }
+              />
+              <InfoRow label="Assurance RC Pro" value={listing.rcProRequired ? 'Obligatoire' : 'Non requise'} />
+              <InfoRow
+                label="Validation de la demande"
+                value={
+                  listing.activityValidationRequired
+                    ? "L'hôte valide chaque demande selon l'activité prévue"
+                    : listing.instantBookEnabled
+                      ? 'Réservation instantanée'
+                      : "Sur validation de l'hôte"
+                }
+              />
             </div>
 
-            <div className="flex flex-wrap gap-2 text-xs">
-              {listing.accessMethod && (
-                <span className="badge">🔑 {ACCESS_METHOD_LABEL[listing.accessMethod] ?? listing.accessMethod}</span>
-              )}
-              {listing.rcProRequired && <span className="badge">Attestation RC Pro requise</span>}
-              {listing.activityValidationRequired && (
-                <span className="badge">Activité validée par l&apos;hôte</span>
-              )}
-              {listing.depositAmount && <span className="badge">Caution {eurRound(listing.depositAmount)}</span>}
-            </div>
-
-            <p className="text-xs text-muted">
-              Ouvert {listing.openDays.map((d) => WEEKDAY_LABEL[d]).join(', ')} de {listing.openStartTime} à{' '}
-              {listing.openEndTime} · durée minimale {listing.minDurationMinutes} min
-              {listing.minNoticeHours > 0 && ` · réservation au moins ${listing.minNoticeHours}h à l'avance`}.
-            </p>
+            <details className="mt-4 text-sm">
+              <summary className="cursor-pointer text-ink">Détail no-show, retard et dépassement</summary>
+              <div className="mt-2">
+                <InfoRow label="No-show" value={cancellationPolicyDetail(listing.cancellationPolicy).noShow} />
+                <InfoRow label="Retard" value={cancellationPolicyDetail(listing.cancellationPolicy).lateArrival} />
+                <InfoRow label="Dépassement" value={cancellationPolicyDetail(listing.cancellationPolicy).overrun} />
+              </div>
+            </details>
 
             {listing.houseRules && (
-              <details className="rounded-md border border-line p-3 text-sm">
-                <summary className="cursor-pointer font-semibold text-ink">Règlement intérieur</summary>
+              <details className="mt-4 text-sm">
+                <summary className="cursor-pointer text-ink">Voir le règlement intérieur</summary>
                 <p className="mt-2 whitespace-pre-wrap text-muted">{listing.houseRules}</p>
               </details>
             )}
@@ -421,10 +312,10 @@ export default function ListingPage() {
           {listing.faqItems && listing.faqItems.length > 0 && (
             <section>
               <h2 className="section-title mb-3">Questions fréquentes</h2>
-              <div className="space-y-2">
+              <div>
                 {listing.faqItems.map((faq) => (
-                  <details key={faq.id} className="rounded-md border border-line p-3 text-sm">
-                    <summary className="cursor-pointer font-semibold text-ink">{faq.question}</summary>
+                  <details key={faq.id} className="border-b border-line py-2.5 text-sm">
+                    <summary className="cursor-pointer text-ink">{faq.question}</summary>
                     <p className="mt-2 text-muted">{faq.answer}</p>
                   </details>
                 ))}
@@ -441,14 +332,9 @@ export default function ListingPage() {
                 {reviews.reviews.slice(0, 6).map((r) => (
                   <div key={r.id} className="space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <Avatar
-                        name={r.author ? `${r.author.firstName} ${r.author.lastName}` : '?'}
-                        size={30}
-                      />
+                      <Avatar name={r.authorFirstName ?? '?'} size={30} />
                       <div className="text-sm">
-                        <span className="font-semibold">
-                          {r.author ? `${r.author.firstName} ${r.author.lastName}` : 'Anonyme'}
-                        </span>
+                        <span className="font-semibold">{r.authorFirstName ?? 'Anonyme'}</span>
                         <div className="mt-0.5">
                           <StarRating value={r.rating} readOnly size={13} />
                         </div>
@@ -516,171 +402,26 @@ export default function ListingPage() {
               </div>
             ) : (
               <>
-                {!paymentsReady && (
+                {!paymentsReady ? (
                   <p className="rounded-md bg-warn-tint px-3 py-2 text-xs text-warn-fg">
                     Cet hôte n&apos;a pas encore activé les paiements. Réservation bientôt disponible.
                   </p>
+                ) : (
+                  <p className="text-sm text-muted">
+                    {listing.instantBookEnabled ? 'Réservation instantanée disponible' : "Sur validation de l'hôte"}
+                  </p>
                 )}
 
-                <form id="booking" onSubmit={handleBook} className="scroll-mt-20 space-y-3">
-                  <div>
-                    <label className="label">Créneau</label>
-                    <SlotPicker listingId={listing.id} value={slot} onChange={setSlot} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="label">Locataires</label>
-                      <input
-                        type="number"
-                        min="1"
-                        required
-                        value={bookingForm.guestCount}
-                        onChange={(e) => setBookingForm((f) => ({ ...f, guestCount: e.target.value }))}
-                        className="field"
-                      />
-                    </div>
-                    <div>
-                      <label className="label">Arrivée</label>
-                      <input
-                        type="time"
-                        value={bookingForm.arrivalTime}
-                        onChange={(e) => setBookingForm((f) => ({ ...f, arrivalTime: e.target.value }))}
-                        className="field"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="label">
-                      Message pour l&apos;hôte <span className="font-normal">(optionnel)</span>
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={bookingForm.guestNote}
-                      onChange={(e) => setBookingForm((f) => ({ ...f, guestNote: e.target.value }))}
-                      className="field resize-y"
-                    />
-                  </div>
+                <Link
+                  href={`/listings/${listing.id}/book`}
+                  className={`btn-primary w-full ${!paymentsReady ? 'pointer-events-none opacity-50' : ''}`}
+                >
+                  Choisir un créneau
+                </Link>
 
-                  {listing.activityValidationRequired && (
-                    <div>
-                      <label className="label">Activité prévue</label>
-                      <textarea
-                        rows={2}
-                        required
-                        placeholder="Décrivez l'activité prévue pour ce créneau — l'hôte doit la valider."
-                        value={bookingForm.activityDescription}
-                        onChange={(e) =>
-                          setBookingForm((f) => ({ ...f, activityDescription: e.target.value }))
-                        }
-                        className="field resize-y"
-                      />
-                    </div>
-                  )}
-
-                  {listing.rcProRequired && (
-                    <label className="flex items-start gap-2 text-xs text-ink/80">
-                      <input
-                        type="checkbox"
-                        required
-                        checked={bookingForm.rcProAccepted}
-                        onChange={(e) =>
-                          setBookingForm((f) => ({ ...f, rcProAccepted: e.target.checked }))
-                        }
-                        className="mt-0.5"
-                      />
-                      Je certifie disposer d&apos;une attestation d&apos;assurance responsabilité civile
-                      professionnelle en cours de validité.
-                    </label>
-                  )}
-
-                  <label className="flex items-start gap-2 text-xs text-ink/80">
-                    <input
-                      type="checkbox"
-                      required
-                      checked={bookingForm.houseRulesAccepted}
-                      onChange={(e) =>
-                        setBookingForm((f) => ({ ...f, houseRulesAccepted: e.target.checked }))
-                      }
-                      className="mt-0.5"
-                    />
-                    J&apos;accepte le{' '}
-                    {listing.houseRules ? (
-                      <button
-                        type="button"
-                        onClick={() => setShowHouseRules((v) => !v)}
-                        className="font-semibold text-brand-fg underline"
-                      >
-                        règlement intérieur
-                      </button>
-                    ) : (
-                      'règlement intérieur'
-                    )}{' '}
-                    de l&apos;annonce.
-                  </label>
-                  {showHouseRules && listing.houseRules && (
-                    <p className="rounded-md bg-canvas p-3 text-xs text-muted">{listing.houseRules}</p>
-                  )}
-
-                  {quoting && <Skeleton className="h-24 w-full" />}
-                  {quote && !quoting && (
-                    <div className="rounded-md bg-canvas p-3">
-                      <PriceBreakdown quote={quote} />
-                    </div>
-                  )}
-
-                  {bookingError && <p className="text-xs text-danger-fg">{bookingError}</p>}
-
-                  {loggedIn ? (
-                    <>
-                      <button
-                        type="submit"
-                        disabled={bookingLoading || !paymentsReady || !slot}
-                        className="btn-primary btn-lg w-full"
-                      >
-                        {bookingLoading
-                          ? 'Réservation…'
-                          : !paymentsReady
-                            ? 'Indisponible'
-                            : quote
-                              ? `Réserver · ${eur(quote.totalAmount)}`
-                              : 'Réserver'}
-                      </button>
-                      <p className="text-center text-[11px] text-muted">
-                        Vous ne serez débité qu&apos;après confirmation.
-                      </p>
-                    </>
-                  ) : (
-                    <div className="rounded-md border border-brand/25 bg-brand-tint/40 p-3.5 text-center">
-                      <p className="text-sm font-semibold text-ink">Connectez-vous pour réserver</p>
-                      <p className="mt-1 text-xs text-muted">
-                        Créez un compte ou connectez-vous pour finaliser cette réservation et
-                        contacter l&apos;hôte. Vos dates et informations restent enregistrées ici.
-                      </p>
-                      <div className="mt-3 flex gap-2">
-                        <Link
-                          href={loginHref(pathname)}
-                          onClick={saveDraft}
-                          className="btn-primary flex-1 justify-center"
-                        >
-                          Se connecter
-                        </Link>
-                        <Link
-                          href={registerHref(pathname)}
-                          onClick={saveDraft}
-                          className="btn-ghost flex-1 justify-center"
-                        >
-                          Créer un compte
-                        </Link>
-                      </div>
-                    </div>
-                  )}
-                </form>
-
-                {loggedIn && (
-                  <button onClick={handleContact} className="btn-ghost w-full">
-                    Contacter l&apos;hôte
-                  </button>
-                )}
+                <p className="text-center text-xs text-muted">
+                  La messagerie avec l&apos;hôte s&apos;active après le paiement de votre réservation.
+                </p>
               </>
             )}
           </div>
@@ -706,12 +447,12 @@ export default function ListingPage() {
             <span className="font-extrabold">{eurRound(listing.basePrice)}</span>
             <span className="text-muted"> / {unit}</span>
           </div>
-          <a
-            href="#booking"
+          <Link
+            href={`/listings/${listing.id}/book`}
             className={`btn-primary ${!paymentsReady ? 'pointer-events-none opacity-50' : ''}`}
           >
-            {paymentsReady ? 'Réserver' : 'Indisponible'}
-          </a>
+            {paymentsReady ? 'Choisir un créneau' : 'Indisponible'}
+          </Link>
         </div>
       )}
 

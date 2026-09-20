@@ -82,7 +82,7 @@ export default function CommercialDashboardPage() {
       )}
 
       {invitations.length === 0 ? (
-        <EmptyState icon="🤝" title="Aucune fiche pour l'instant">
+        <EmptyState title="Aucune fiche pour l'instant">
           Créez une fiche lors d&apos;une visite terrain pour inviter un hôte à activer son compte.
         </EmptyState>
       ) : (

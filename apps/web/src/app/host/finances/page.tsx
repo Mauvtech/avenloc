@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, type PaymentHistoryItem, type ConnectStatus } from '@/lib/api';
 import { EmptyState, PageHeader, PageLoader } from '@/components/ui';
+import { downloadInvoice } from '@/lib/invoice';
+import { useToast } from '@/components/toast';
 import { dateShort, eur } from '@/lib/format';
 import { useHostGuard } from '../use-host-guard';
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'En attente',
-  CAPTURED: 'Encaissé',
+  CAPTURED: 'Reversé',
   REFUNDED: 'Remboursé',
   PARTIALLY_REFUNDED: 'Partiellement remboursé',
   FAILED: 'Échoué',
@@ -17,9 +19,11 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function HostFinancesPage() {
   const { ready } = useHostGuard();
+  const toast = useToast();
   const [history, setHistory] = useState<PaymentHistoryItem[]>([]);
   const [connect, setConnect] = useState<ConnectStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ready) return;
@@ -34,17 +38,39 @@ export default function HostFinancesPage() {
       .finally(() => setLoading(false));
   }, [ready]);
 
+  async function handleInvoice(payment: PaymentHistoryItem) {
+    setDownloadingId(payment.id);
+    try {
+      const booking = await api.bookings.getById(payment.booking.id);
+      downloadInvoice(payment, booking, connect?.holderName ?? undefined);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Impossible de générer la facture');
+    } finally {
+      setDownloadingId(null);
+    }
+  }
+
   if (!ready || loading) return <PageLoader />;
 
-  const totalNet = history
-    .filter((p) => p.status === 'CAPTURED')
-    .reduce((sum, p) => sum + Number(p.hostPayout), 0);
+  const captured = history.filter((p) => p.status === 'CAPTURED');
+  const totalNet = captured.reduce((sum, p) => sum + Number(p.hostPayout), 0);
 
   return (
-    <div className="space-y-4">
+    <div>
       <PageHeader title="Finances" />
 
-      <div className="card flex flex-wrap items-center justify-between gap-3 p-4">
+      <div className="mb-8 mt-5 flex flex-wrap gap-4">
+        <div className="flex-1 rounded-md border border-line p-[18px]">
+          <div className="text-[13px] text-muted">Revenu net</div>
+          <div className="mt-1.5 text-[22px] font-bold">{eur(totalNet)}</div>
+        </div>
+        <div className="flex-1 rounded-md border border-line p-[18px]">
+          <div className="text-[13px] text-muted">Réservations</div>
+          <div className="mt-1.5 text-[22px] font-bold">{captured.length}</div>
+        </div>
+      </div>
+
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-line p-4">
         <div>
           <p className="text-xs text-muted">Encaissements</p>
           <p className="text-sm font-semibold">
@@ -58,30 +84,38 @@ export default function HostFinancesPage() {
         </Link>
       </div>
 
-      <div className="card p-4">
-        <p className="text-xs text-muted">Total net reversé</p>
-        <p className="text-2xl font-extrabold tracking-tight">{eur(totalNet)}</p>
-      </div>
+      <p className="section-title mb-3">Historique des reversements</p>
 
       {history.length === 0 ? (
-        <EmptyState icon="💳" title="Aucun encaissement pour l'instant">
+        <EmptyState title="Aucun encaissement pour l'instant">
           L&apos;historique de vos versements apparaîtra ici après vos premières réservations payées.
         </EmptyState>
       ) : (
-        <div className="space-y-2">
-          {history.map((p) => (
-            <div key={p.id} className="card flex items-center justify-between gap-3 p-3.5 text-sm">
-              <div className="min-w-0">
-                <p className="truncate font-semibold">{p.booking.listing.title}</p>
-                <p className="text-xs text-muted">
-                  {p.booking.tenant.firstName} {p.booking.tenant.lastName} ·{' '}
-                  {p.capturedAt ? dateShort(p.capturedAt) : dateShort(p.createdAt)}
-                </p>
+        <div className="overflow-hidden rounded-lg border border-line">
+          {history.map((p, i) => (
+            <div
+              key={p.id}
+              className={`flex flex-wrap items-center gap-x-4 gap-y-1 px-[18px] py-3.5 text-[13px] ${i > 0 ? 'border-t border-line' : ''}`}
+            >
+              <div className="min-w-[110px] text-muted">
+                {p.capturedAt ? dateShort(p.capturedAt) : dateShort(p.createdAt)}
               </div>
-              <div className="flex-none text-right">
-                <p className="font-extrabold tabular-nums">{eur(p.hostPayout)}</p>
-                <p className="text-[11px] text-muted">{STATUS_LABEL[p.status] ?? p.status}</p>
+              <div className="min-w-0 flex-1 truncate font-medium">
+                {p.booking.listing.title}
+                <span className="font-normal text-muted">
+                  {' '}
+                  · {p.booking.tenant.firstName} {p.booking.tenant.lastName}
+                </span>
               </div>
+              <div className="font-medium">{eur(p.hostPayout)}</div>
+              <div className="w-32 text-muted">{STATUS_LABEL[p.status] ?? p.status}</div>
+              <button
+                onClick={() => handleInvoice(p)}
+                disabled={downloadingId === p.id}
+                className="ml-auto bg-transparent text-[13px] font-semibold text-brand-fg hover:underline disabled:opacity-50"
+              >
+                {downloadingId === p.id ? 'Génération…' : 'Télécharger la facture'}
+              </button>
             </div>
           ))}
         </div>

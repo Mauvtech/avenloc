@@ -21,22 +21,20 @@ export function ListingCardSkeleton() {
 }
 
 /* ── Empty state ─────────────────────────────────────────────────────── */
+// Le prototype ne montre jamais d'icône pour un état vide, juste un texte
+// centré ("Aucun espace ne correspond à ces critères.") — pas de carte, pas
+// de pastille décorative.
 export function EmptyState({
-  icon = '✦',
   title,
   children,
   action,
 }: {
-  icon?: ReactNode;
   title: string;
   children?: ReactNode;
   action?: ReactNode;
 }) {
   return (
-    <div className="card flex flex-col items-center gap-3 px-6 py-14 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-canvas text-lg text-ink">
-        {icon}
-      </div>
+    <div className="flex flex-col items-center gap-3 py-14 text-center">
       <div>
         <p className="font-bold text-ink">{title}</p>
         {children && <p className="mt-1 text-sm text-muted">{children}</p>}

@@ -42,7 +42,7 @@ export default function HostReviewsPage() {
       />
 
       {reviews.length === 0 ? (
-        <EmptyState icon="⭐" title="Aucun avis pour l'instant">
+        <EmptyState title="Aucun avis pour l'instant">
           Les avis de vos locataires apparaîtront ici une fois vos réservations terminées.
         </EmptyState>
       ) : (
@@ -54,12 +54,12 @@ export default function HostReviewsPage() {
                 <span className="text-xs text-muted">{dateShort(r.createdAt)}</span>
               </div>
               {r.listingTitle && (
-                <Link
-                  href={`/listings/${r.listingId}`}
-                  className="block text-xs font-semibold text-brand-fg hover:underline"
-                >
-                  {r.listingTitle}
-                </Link>
+                <div className="text-xs font-semibold">
+                  <Link href={`/listings/${r.listingId}`} className="text-brand-fg hover:underline">
+                    {r.listingTitle}
+                  </Link>
+                  {r.authorFirstName && <span className="font-normal text-muted"> · {r.authorFirstName}</span>}
+                </div>
               )}
               {r.comment && <p className="text-sm text-ink/80">{r.comment}</p>}
               {r.criteria && <p className="text-xs text-muted">Critères évalués : {r.criteria}</p>}
