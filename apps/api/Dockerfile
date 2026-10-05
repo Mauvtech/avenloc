@@ -23,7 +23,7 @@ FROM deps AS build
 COPY apps/api apps/api
 RUN pnpm --filter @aven/api exec prisma generate \
  && pnpm --filter @aven/api build \
- && pnpm --filter @aven/api exec tsc prisma/seed.ts prisma/photo-catalog.ts \
+ && pnpm --filter @aven/api exec tsc prisma/seed.ts prisma/partner-spaces.ts \
       --outDir prisma/dist --module commonjs --target ES2021 \
       --moduleResolution node --esModuleInterop --skipLibCheck --resolveJsonModule
 

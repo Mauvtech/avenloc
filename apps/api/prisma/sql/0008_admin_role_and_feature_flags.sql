@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS "FeatureFlagState" (
   "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-INSERT INTO "FeatureFlagState" (id, flags)
-VALUES ('default', '{"simulatePayments": true}'::jsonb)
+-- "updatedAt" explicite : sur une base vierge, `prisma db push` a déjà créé la
+-- table depuis schema.prisma (@updatedAt = pas de DEFAULT en base), donc le
+-- CREATE TABLE IF NOT EXISTS ci-dessus est ignoré et le DEFAULT now() n'existe pas.
+INSERT INTO "FeatureFlagState" (id, flags, "updatedAt")
+VALUES ('default', '{"simulatePayments": true}'::jsonb, now())
 ON CONFLICT (id) DO NOTHING;

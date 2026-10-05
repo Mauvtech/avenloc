@@ -202,8 +202,9 @@ cd apps/web && pnpm dev
 3. Pour les annonces sans Instant Book : aller dans les réservations → approuver
 
 ### Tester l'Instant Book vs validation hôte
-- Annonce seed "Bel appartement dans le Marais" → `instantBookEnabled: true` → confirmation automatique
-- Annonce seed "Salle de réunion" → `instantBookEnabled: false` → validation hôte requise
+Le catalogue seedé vient de nos 40 espaces partenaires (`prisma/partner-spaces.ts`).
+- Annonce seed "Bureau ponctuel 3 postes" → `instantBookEnabled: true` → confirmation automatique
+- Toutes les autres annonces (ex. "KABIN - Paris Gare de Lyon SNCF") → `instantBookEnabled: false` → validation hôte requise
 
 ---
 
